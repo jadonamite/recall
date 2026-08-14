@@ -1,0 +1,18 @@
+{
+  "name": "recall",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "jadonamite",
+  "description": "The product-recall query for software supply chains — paths, blast radius, cut points over a dependency graph",
+  "scripts": {
+    "ingest": "node src/ingest.js",
+    "advisories": "node src/advisories.js",
+    "load": "node src/load.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "neo4j-driver": "^6.2.0",
+    "semver": "^7.8.5"
+  }
+}
