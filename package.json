@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "author": "jadonamite",
-  "description": "The product-recall query for software supply chains — paths, blast radius, cut points over a dependency graph",
+  "description": "The product-recall query for software supply chains \u2014 paths, blast radius, cut points over a dependency graph",
   "scripts": {
     "ingest": "node src/ingest.js",
     "advisories": "node src/advisories.js",
@@ -14,5 +14,17 @@
   "dependencies": {
     "neo4j-driver": "^6.2.0",
     "semver": "^7.8.5"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jadonamite/recall.git"
+  },
+  "keywords": [
+    "supply-chain",
+    "dependency-graph",
+    "osv",
+    "npm",
+    "security",
+    "graph-database"
+  ]
 }
