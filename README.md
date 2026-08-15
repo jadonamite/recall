@@ -113,13 +113,14 @@ public/index.html        the UI, single file
 
 ## Run
 
+The crawled dataset is committed — 2,270 packages, 4,557 edges and 979 advisory
+windows in `data/` — so there is no waiting on a crawl to see this work.
+
 ```bash
+npm install
 npm test                            # 31 tests, no network, no database
 
-node src/ingest.js                  # build the seed dependency graph
-node src/advisory-history.js        # attach advisory windows
-node src/load.js                    # load into HydraDB
-
+npm run load                        # load the committed graph into HydraDB (~2s)
 npm run recall ~/code/my-app        # the recall, on a real project
 npm run ui                          # the same thing, in a browser
 
@@ -128,7 +129,31 @@ node src/query.js recall brace-expansion@1.1.12
 node src/query.js cuts   brace-expansion@1.1.12
 ```
 
-Needs a HydraDB node on `bolt://127.0.0.1:7687` (override with `HYDRA_BOLT` / `HYDRA_TOKEN`).
+Rebuilding the dataset from scratch is `node src/ingest.js` then `node src/advisory-history.js`; both are resume-safe and take a while.
+
+### Running HydraDB
+
+Everything above needs a HydraDB node on `bolt://127.0.0.1:7687` (override with `HYDRA_BOLT` / `HYDRA_TOKEN`, which default to that address and to the token below).
+
+This is the exact environment the node used for every number in this README — the binary came out of `ghcr.io/hydra-db/hydradb`, run directly rather than under a container runtime, because this machine has neither Docker nor root:
+
+```bash
+H=./.hydradb
+mkdir -p $H && printf 'local-development-token-32-bytes' > $H/auth-token
+
+CLOUD_PROVIDER=local LOCAL_PATH=$H/store \
+GRAPH_NAMESPACE=default GRAPH_ID=default \
+GRAPH_CELL_ID=cell-0 GRAPH_CELLS=cell-0 GRAPH_NODE_ID=node-0 \
+GRAPH_BOLT_NODE_ADDRESSES=node-0=127.0.0.1:7687 \
+GRAPH_ADVERTISED_BOLT_ADDR=127.0.0.1:7687 \
+GRAPH_DATA_CACHE_DIR=$H/cache GRAPH_AUTH_TOKEN_FILE=$H/auth-token \
+GRAPH_ALLOW_PLAINTEXT=true RUST_MIN_STACK=33554432 \
+  graph-node
+```
+
+Under Docker the same variables apply, with `-p 7687:7687` and the paths pointing inside the container.
+
+`RUST_MIN_STACK=33554432` is **not optional** — without it the node starts, serves `/readyz`, and then aborts on the first traversal.
 
 ### Notes on the store
 

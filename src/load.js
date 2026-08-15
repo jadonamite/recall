@@ -25,13 +25,13 @@
 
 'use strict';
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import neo4j from 'neo4j-driver';
 
 const DATA = new URL('../data/', import.meta.url).pathname;
 const BOLT = process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687';
 const TOKEN = process.env.HYDRA_TOKEN ?? 'local-development-token-32-bytes';
-const BATCH = 500;
+const BATCH = 100; // larger payloads make the Bolt driver throw while packing
 const ADV_BASE = 10_000_000; // advisory ids live above the package id space
 
 const ndjson = (f) =>
@@ -60,15 +60,27 @@ async function run() {
     const windows = ndjson('advisory-windows.ndjson');
 
     // ---- integer id assignment -------------------------------------------
-    const pkgId = new Map();
-    nodes.forEach((n, i) => pkgId.set(n.key, i));
+    // Ids already handed out are KEPT. project.js appends real projects to this
+    // graph using ids above the seed range; reassigning from zero here would
+    // point those ids at different packages while their edges were still in the
+    // store, inventing dependency paths that never existed.
+    const prev = existsSync(`${DATA}idmap.json`)
+      ? JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'))
+      : { packages: {}, advisories: {} };
 
-    const advId = new Map();
+    const pkgId = new Map(Object.entries(prev.packages ?? {}));
+    let nextPkg = Math.max(-1, ...pkgId.values()) + 1;
+    for (const n of nodes) if (!pkgId.has(n.key)) pkgId.set(n.key, nextPkg++);
+
+    const advId = new Map(Object.entries(prev.advisories ?? {}));
+    let nextAdv = Math.max(ADV_BASE - 1, ...advId.values()) + 1;
     const advRows = [];
+    const seenAdv = new Set();
     for (const w of windows) {
-      if (advId.has(w.id)) continue;
-      const id = ADV_BASE + advId.size;
-      advId.set(w.id, id);
+      if (seenAdv.has(w.id)) continue;
+      seenAdv.add(w.id);
+      if (!advId.has(w.id)) advId.set(w.id, nextAdv++);
+      const id = advId.get(w.id);
       advRows.push({
         id: neo4j.int(id),
         osv: w.id,
