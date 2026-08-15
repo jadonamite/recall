@@ -35,9 +35,13 @@ import { Recall, cypherFor, relTypeFor } from './query.js';
 const DATA = new URL('../data/', import.meta.url).pathname;
 const BOLT = process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687';
 const TOKEN = process.env.HYDRA_TOKEN ?? 'local-development-token-32-bytes';
-// 500 (load.js's size) makes the Bolt driver throw a RangeError while packing a
-// project-sized payload against this server; 100 is comfortably under it.
-const BATCH = 100;
+// The Bolt driver throws `RangeError: offset out of range` while packing large
+// payloads against this server — and throws it asynchronously, so it escapes
+// try/catch and takes the process with it. It scales with payload bytes, so
+// rows carrying long strings (advisory summaries, package keys) go in smaller
+// batches than rows that are only integers.
+const BATCH = 100;      // id-only rows: dependency and advisory edges
+const BATCH_TEXT = 25;  // rows carrying strings
 const ADV_BASE = 10_000_000;
 const PROJ_REL_BASE = 900_000_000; // keeps project advisory edge ids clear of load.js's
 
@@ -138,27 +142,35 @@ export async function upsert(graph) {
 
   const driver = neo4j.driver(BOLT, neo4j.auth.basic('token', TOKEN), { disableLosslessIntegers: true });
   const session = driver.session();
-  const batched = async (rows, cypher) => {
-    for (let i = 0; i < rows.length; i += BATCH) await session.run(cypher, { rows: rows.slice(i, i + BATCH) });
+  // Bolt failures surface as opaque driver errors with no hint which write threw,
+  // so every batch says what it was and where it stopped.
+  const batched = async (label, rows, cypher, size = BATCH) => {
+    for (let i = 0; i < rows.length; i += size) {
+      try {
+        await session.run(cypher, { rows: rows.slice(i, i + size) });
+      } catch (e) {
+        throw new Error(`${label}: rows ${i}\u2013${i + size} of ${rows.length} \u2014 ${e.message}`);
+      }
+    }
   };
 
   try {
-    await batched(newNodes.map((n) => ({
+    await batched('packages', newNodes.map((n) => ({
       id: neo4j.int(map.packages[n.key]), key: n.key, name: n.name, version: n.version, seed: false,
     })), `
       UNWIND $rows AS row
       MERGE (n {id: row.id})
       SET n:Package, n.key = row.key, n.name = row.name, n.version = row.version, n.seed = row.seed
-    `);
+    `, BATCH_TEXT);
 
-    await batched(newAdvisories.map((w) => ({
+    await batched('advisories', newAdvisories.map((w) => ({
       id: neo4j.int(map.advisories[w.id]), osv: w.id,
       severity: String(w.severity ?? 'UNKNOWN'), summary: String(w.summary ?? '').slice(0, 300),
     })), `
       UNWIND $rows AS row
       MERGE (n {id: row.id})
       SET n:Advisory, n.osv = row.osv, n.severity = row.severity, n.summary = row.summary
-    `);
+    `, BATCH_TEXT);
 
     const depRows = graph.edges
       .map((e) => ({ f: map.packages[e.from], t: map.packages[e.to] }))
@@ -169,14 +181,14 @@ export async function upsert(graph) {
     // once under a type private to this project so its traversal cannot be
     // crowded out of `pathCount` by an unrelated project in the same store.
     for (const type of ['DEPENDS_ON', relType]) {
-      await batched(depRows, `
+      await batched(`depends_on:${type}`, depRows, `
         UNWIND $rows AS row
         MATCH (s:Package {id: row.f}), (t:Package {id: row.t})
         MERGE (s)-[r:${type} {id: row.rid}]->(t)
       `);
     }
 
-    await batched(advEdges, `
+    await batched('has_advisory', advEdges, `
       UNWIND $rows AS row
       MATCH (s:Package {id: row.f}), (a:Advisory {id: row.t})
       MERGE (s)-[r:HAS_ADVISORY {id: row.rid}]->(a)

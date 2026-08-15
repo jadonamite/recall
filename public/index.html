@@ -272,6 +272,15 @@
   .err.on { display: block; }
   .err code { color: #ffd7d3; }
 
+  /* recorded-scan disclosure — only shown on the static deployment */
+  .recorded { display: none; margin-top: 24px; gap: 14px; align-items: flex-start;
+    padding: 15px 17px; border: 1px solid #453d22; border-radius: 11px;
+    background: rgba(255,212,121,.04); }
+  .recorded.on { display: flex; }
+  .recorded p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-dim); max-width: 78ch; }
+  .recorded strong { color: var(--ink); font-weight: 600; }
+  .recorded .pill { flex: none; margin-top: 1px; }
+
   /* empty state — retires as soon as there is a real answer on screen */
   .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-top: 44px; }
   .how.off { display: none; }
@@ -330,6 +339,18 @@
 </section>
 
 <div class="err" id="err"></div>
+
+<div class="recorded" id="recorded">
+  <span class="pill sev-MEDIUM">RECORDED</span>
+  <p>
+    This is a <strong>recorded scan</strong>, not a live one. Recall's traversal needs a Bolt
+    connection to a HydraDB node and reads a lock file off disk, neither of which exists on a
+    static host — so the scan below was run locally and its result published with the page.
+    Nothing is trimmed or invented: it is exactly what <code>npm run recall</code> printed for
+    <a id="rec-src" href="#" rel="noreferrer">this public repository's committed lock file</a>,
+    on <span id="rec-date"></span>. Clone the repo to run it against your own.
+  </p>
+</div>
 
 <section class="how" id="how">
   <div class="how-item">
@@ -475,9 +496,40 @@ function renderSteps(state) {
   }
 }
 
+// --------------------------------------------------------- recorded demo
+// On a static host there is no /api/scan and no graph database behind it, so
+// the page renders a scan that was computed locally and shipped alongside it.
+// The input console is removed rather than left there to fail on click.
+async function loadRecorded(src) {
+  const r = await fetch(src, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`could not load ${src}`);
+  const report = await r.json();
+
+  document.querySelector('.console').classList.add('hide');
+  $('how').classList.add('off');
+
+  const banner = $('recorded');
+  banner.classList.add('on');
+  $('rec-date').textContent = report.recordedAt ?? 'an earlier date';
+  const a = $('rec-src');
+  if (report.sourceUrl) {
+    a.href = report.sourceUrl;
+    a.textContent = report.sourceLabel ?? report.sourceUrl;
+  } else {
+    a.replaceWith(document.createTextNode('a public repository’s committed lock file'));
+  }
+
+  render(report, 'recorded');
+  $('out').scrollIntoView({ block: 'start' });
+}
+
 // ------------------------------------------------------------------- run
 $('run').addEventListener('click', run);
 $('dir').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+
+if (window.RECALL_DEMO) {
+  loadRecorded(window.RECALL_DEMO).catch((e) => fail(e.message));
+}
 
 async function run() {
   const btn = $('run');
@@ -546,6 +598,13 @@ async function run() {
           done = true;
         }
       }
+    }
+    // The stream ended without a verdict — the scan died server-side rather
+    // than reporting. Say so instead of leaving the page looking idle.
+    if (!done) {
+      for (const [k] of STEPS) if (state[k] === 'active') state[k] = 'bad';
+      renderSteps(state);
+      fail('the scan ended without returning a result — check the server log');
     }
   } catch (e) {
     fail(e.message);

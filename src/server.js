@@ -103,6 +103,14 @@ const server = createServer(async (req, res) => {
   res.end('not found\n');
 });
 
+// The Bolt driver can throw while packing a large write, asynchronously enough
+// that it escapes the try/catch around the call and would otherwise take the
+// whole server down mid-scan. Log it and keep serving; the in-flight request
+// ends without a `done` event, which the page already reports as a failure.
+process.on('uncaughtException', (e) => {
+  console.error(`uncaught: ${e?.message ?? e}`);
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`recall ui  ·  http://${HOST}:${PORT}`);
   console.log(`hydradb    ·  ${process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687'}`);

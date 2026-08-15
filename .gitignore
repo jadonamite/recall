@@ -6,3 +6,7 @@ logs/
 # The crawled dataset IS committed — it makes the repo runnable without waiting
 # on a deps.dev crawl and a few thousand OSV queries. Only derived state is not:
 data/idmap.json
+
+# static demo build output (deployed to Vercel, not source)
+dist/
+.vercel/

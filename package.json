@@ -11,7 +11,8 @@
     "load": "node src/load.js",
     "test": "node --test test/*.test.js",
     "ui": "node src/server.js",
-    "recall": "node src/project.js"
+    "recall": "node src/project.js",
+    "demo": "node src/build-demo.js"
   },
   "dependencies": {
     "neo4j-driver": "^6.2.0",

@@ -45,6 +45,12 @@ The result is alert fatigue — the defining failure of the category. Developers
 
 ## The web UI
 
+**Live demo → https://recall-jadonamites-projects.vercel.app**
+
+That deployment is a **recorded scan**, and it says so on the page. Recall cannot run on a serverless host: the traversal needs a Bolt connection to a HydraDB node, resolution reads a lock file off disk, and a first scan of an unseen project queries OSV for hundreds of package names. So the demo is the real UI rendering a real scan — [jitsi/jitsi-meet](https://github.com/jitsi/jitsi-meet)'s committed lock file, 1,920 packages, **135 findings collapsed onto 40 upgrades** — computed locally and published with the page. Nothing is trimmed or invented, and anyone can re-run it.
+
+To run it live against your own project:
+
 ```bash
 npm run ui      # http://127.0.0.1:7676
 ```
@@ -109,7 +115,15 @@ src/load.js              batched idempotent load into HydraDB over Bolt
 src/project.js           resolve → backfill → upsert → recall → report
 src/query.js             the graph queries + CLI
 src/server.js            zero-dependency local web UI
+src/build-demo.js        bake a real scan into a static, deployable page
 public/index.html        the UI, single file
+```
+
+Building the static demo:
+
+```bash
+node src/build-demo.js <dir-or-lockfile> --dev --source <repo-url>
+# → dist/index.html + dist/demo.json, deployable as plain static files
 ```
 
 ## Run
@@ -174,6 +188,11 @@ HydraDB speaks a deliberately narrow OpenCypher subset. What the loader and quer
 - **Reachability.** Recall reports that a vulnerable version is present in your tree and by what chain. It does not claim the vulnerable *code* is called at runtime. That is a genuinely harder problem, and tools that blur the line are the reason people stopped trusting the category.
 - **Completeness of the seed graph.** The ~150-package seed list in `ingest.js` is a judgement call about what the ecosystem leans on, not a mirror of npm. Resolving your own project is not affected by it — your tree is ingested whole.
 - **That upgrading the listed dependency is always possible.** Sometimes the fix is an `overrides` entry, and sometimes upstream has not shipped one. Recall tells you where the path enters; it does not promise the door opens.
+- **That the hosted demo is live.** It is a recorded scan, labelled as one on the page. The traversal genuinely ran against HydraDB — just on a laptop, before deployment, not in response to your click.
+
+## Known rough edge
+
+The Bolt driver throws `RangeError: offset out of range` while packing large writes against this server, and throws it asynchronously enough to escape a `try`/`catch` and take the process with it. It scales with payload bytes, so writes are batched conservatively (25 rows for anything carrying strings, 100 for id-only rows) and the UI server survives it rather than dying mid-scan. It is a driver/server interaction, not a data problem — the same rows succeed in smaller batches.
 
 ## Data sources
 
