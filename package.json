@@ -4,12 +4,14 @@
   "type": "module",
   "license": "MIT",
   "author": "jadonamite",
-  "description": "The product-recall query for software supply chains \u2014 paths, blast radius, cut points over a dependency graph",
+  "description": "The product-recall query for software supply chains — paths, blast radius, cut points over a dependency graph",
   "scripts": {
     "ingest": "node src/ingest.js",
     "advisories": "node src/advisories.js",
     "load": "node src/load.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "ui": "node src/server.js",
+    "recall": "node src/project.js"
   },
   "dependencies": {
     "neo4j-driver": "^6.2.0",

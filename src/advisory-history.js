@@ -56,9 +56,20 @@ export function windowsOf(vuln, name) {
   return out;
 }
 
+/**
+ * Pick the most rateable severity OSV offers, in that order — not the first one
+ * in the array. Records commonly carry a CVSS v3 vector AND a v4 vector; v3 has
+ * a closed-form score (severity.js computes it), v4 does not, so preferring
+ * whichever happened to be listed first throws away a real number roughly half
+ * the time and leaves the finding UNRATED.
+ */
 export function severityOf(v) {
-  const cvss = v.severity?.find((s) => s.type?.startsWith('CVSS'));
-  return cvss?.score ?? v.database_specific?.severity ?? 'UNKNOWN';
+  const byType = (t) => v.severity?.find((s) => s.type === t)?.score;
+  return byType('CVSS_V3')
+    ?? v.database_specific?.severity
+    ?? byType('CVSS_V4')
+    ?? v.severity?.find((s) => s.type?.startsWith('CVSS'))?.score
+    ?? 'UNKNOWN';
 }
 
 async function main() {

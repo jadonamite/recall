@@ -24,6 +24,19 @@ const DATA = new URL('../data/', import.meta.url).pathname;
 const BOLT = process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687';
 const TOKEN = process.env.HYDRA_TOKEN ?? 'local-development-token-32-bytes';
 
+/**
+ * The traversal, verbatim. Exported so the UI can show the query that produced
+ * what is on screen rather than a prettified retelling of it.
+ */
+export const TRAVERSAL_CYPHER = `CALL algo.SSpaths({
+  sourceNode: $v,
+  relTypes: ['DEPENDS_ON'],
+  relDirection: 'incoming',
+  maxLen: $maxLen,
+  pathCount: $limit
+})
+YIELD path RETURN path`;
+
 export class Recall {
   constructor() {
     this.map = JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
@@ -56,11 +69,9 @@ export class Recall {
    * @returns {Promise<{path: string[], depth: number}[]>}
    */
   async recall(key, { maxLen = 6, limit = 500 } = {}) {
-    const r = await this.session.run(`
-      CALL algo.SSpaths({sourceNode: $v, relTypes: ['DEPENDS_ON'],
-                         maxLen: $maxLen, relDirection: 'incoming', pathCount: $limit})
-      YIELD path RETURN path
-    `, { v: this.id(key), maxLen: neo4j.int(maxLen), limit: neo4j.int(limit) });
+    const r = await this.session.run(TRAVERSAL_CYPHER, {
+      v: this.id(key), maxLen: neo4j.int(maxLen), limit: neo4j.int(limit),
+    });
 
     return r.records.map((rec) => {
       const p = rec.get('path');
