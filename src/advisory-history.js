@@ -20,7 +20,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs
 const DATA = new URL('../data/', import.meta.url).pathname;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function queryName(name, tries = 4) {
+export async function queryName(name, tries = 4) {
   for (let i = 0; i < tries; i++) {
     try {
       const res = await fetch('https://api.osv.dev/v1/query', {
@@ -38,7 +38,7 @@ async function queryName(name, tries = 4) {
   }
 }
 
-function windowsOf(vuln, name) {
+export function windowsOf(vuln, name) {
   const out = [];
   for (const aff of vuln.affected ?? []) {
     if (aff.package?.name !== name || aff.package?.ecosystem !== 'npm') continue;
@@ -56,7 +56,7 @@ function windowsOf(vuln, name) {
   return out;
 }
 
-function severityOf(v) {
+export function severityOf(v) {
   const cvss = v.severity?.find((s) => s.type?.startsWith('CVSS'));
   return cvss?.score ?? v.database_specific?.severity ?? 'UNKNOWN';
 }
@@ -97,4 +97,7 @@ async function main() {
   console.log(`done · ${advisories} advisory windows across ${processed} names`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Only crawl when run directly — resolve.js imports the fetch helpers above.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
