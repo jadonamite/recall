@@ -76,11 +76,11 @@ async function scan(req, res) {
     send({ stage: 'advisories-done', ...adv });
 
     send({ stage: 'load', message: 'loading the tree into HydraDB' });
-    const { exposed, newPackages } = await upsert(graph);
+    const { exposed, newPackages, relType } = await upsert(graph);
     send({ stage: 'loaded', newPackages, hits: exposed.length });
 
     send({ stage: 'recall', message: 'traversing DEPENDS_ON backwards from each vulnerable version' });
-    const out = await report(graph, exposed);
+    const out = await report(graph, exposed, { relType });
     send({ stage: 'done', report: out });
   } catch (e) {
     send({ stage: 'error', message: e.message ?? String(e) });

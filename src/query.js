@@ -27,15 +27,41 @@ const TOKEN = process.env.HYDRA_TOKEN ?? 'local-development-token-32-bytes';
 /**
  * The traversal, verbatim. Exported so the UI can show the query that produced
  * what is on screen rather than a prettified retelling of it.
+ *
+ * The relationship type is interpolated rather than parameterised because a
+ * Cypher relationship type cannot be a parameter. Callers pass a type this
+ * module generated (see `relTypeFor`), and it is sanitized here regardless.
  */
-export const TRAVERSAL_CYPHER = `CALL algo.SSpaths({
+export const cypherFor = (relType = 'DEPENDS_ON') => `CALL algo.SSpaths({
   sourceNode: $v,
-  relTypes: ['DEPENDS_ON'],
+  relTypes: ['${safeRelType(relType)}'],
   relDirection: 'incoming',
   maxLen: $maxLen,
   pathCount: $limit
 })
 YIELD path RETURN path`;
+
+export const TRAVERSAL_CYPHER = cypherFor();
+
+/** Relationship types are interpolated into Cypher, so they are whitelisted. */
+export function safeRelType(t) {
+  const s = String(t).replace(/[^A-Za-z0-9_]/g, '_');
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) throw new Error(`unusable relationship type: ${t}`);
+  return s;
+}
+
+/**
+ * A relationship type private to one project.
+ *
+ * `pathCount` caps how many paths the procedure returns, and that cap applies
+ * across everything in the store — so with several projects loaded, another
+ * project's paths can crowd out the ones from this root and a genuinely
+ * reachable vulnerability reads as unreachable. A project's resolved tree is
+ * self-contained, so scoping the traversal to its own edges makes the answer
+ * exact and independent of whatever else has been scanned.
+ */
+export const relTypeFor = (rootKey) =>
+  safeRelType('IN_' + String(rootKey).toUpperCase()).slice(0, 120);
 
 export class Recall {
   constructor() {
@@ -68,8 +94,8 @@ export class Recall {
    * package and return the actual chains that reach it.
    * @returns {Promise<{path: string[], depth: number}[]>}
    */
-  async recall(key, { maxLen = 6, limit = 500 } = {}) {
-    const r = await this.session.run(TRAVERSAL_CYPHER, {
+  async recall(key, { maxLen = 6, limit = 500, relType = 'DEPENDS_ON' } = {}) {
+    const r = await this.session.run(cypherFor(relType), {
       v: this.id(key), maxLen: neo4j.int(maxLen), limit: neo4j.int(limit),
     });
 

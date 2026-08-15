@@ -18,15 +18,16 @@ my-app@0.1.2  ·  exact (package-lock.json)
 15 direct dependencies to upgrade:
 
   CRITICAL 9.6    4 vulnerable versions ·    4 paths · vitest@4.1.4
-  HIGH 8.7       10 vulnerable versions ·   88 paths · @privy-io/react-auth@3.27.1
-  HIGH 7.5        9 vulnerable versions ·  238 paths · @web3auth/modal@10.16.0
+  HIGH 8.7       10 vulnerable versions ·  202 paths · @privy-io/react-auth@3.27.1
+  HIGH 7.5        9 vulnerable versions ·  245 paths · @web3auth/modal@10.16.0
+  HIGH 8.7        5 vulnerable versions ·  190 paths · @reown/appkit-adapter-wagmi@1.8.19
   …
 
 worst chains:
-  [6] my-app@0.1.2 → @privy-io/react-auth@3.27.1 → x402@0.7.3 → @solana/kit@5.5.1
-      → @solana/rpc-subscriptions@5.5.1 → @solana/rpc-subscriptions-channel-websocket@5.5.1
-      → ws@8.20.0
-      HIGH  GHSA-58qx-3vcg-4xpx  ws: Uninitialized memory disclosure
+  [1] my-app@0.1.2 → vitest@4.1.4
+      CRITICAL  GHSA-9crc-q9x8-hgqq  Vitest allows Remote Code Execution …
+  [2] my-app@0.1.2 → viem@2.48.11 → ws@8.18.3
+      HIGH  GHSA-96hv-2xvq-fx4p  ws: Memory exhaustion DoS from tiny fragments …
 ```
 
 **111 findings became 15 upgrades.** Not by filtering anything out — every finding is still there. By asking the question a scanner cannot ask: *by what path does this reach me?* Every path enters through exactly one direct dependency, and that is the only thing you can actually change.
@@ -118,7 +119,7 @@ windows in `data/` — so there is no waiting on a crawl to see this work.
 
 ```bash
 npm install
-npm test                            # 31 tests, no network, no database
+npm test                            # 37 tests, no network, no database
 
 npm run load                        # load the committed graph into HydraDB (~2s)
 npm run recall ~/code/my-app        # the recall, on a real project
@@ -166,6 +167,7 @@ HydraDB speaks a deliberately narrow OpenCypher subset. What the loader and quer
 - `SET` values must read from the row map — a literal in an `UNWIND` write is rejected
 - no `IN`, `CONTAINS`, `IS NULL`, or `RETURN *`
 - reverse variable-length patterns are unsupported, so the reverse traversal runs as the native `algo.SSpaths` procedure with `relDirection: 'incoming'` — that one parameter *is* the recall
+- `algo.SSpaths`'s `pathCount` caps returned paths across the whole store, so each scanned project's edges are also written under a relationship type private to that project. Without it, one project's paths can crowd out another's and a genuinely reachable vulnerability reads as unreachable — which is exactly the silent false negative this tool exists to avoid.
 
 ## What this does not claim
 

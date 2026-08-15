@@ -2597,3 +2597,7 @@ web3
 @nuxt/devtools
 apollo-server
 vitest-environment-clarinet
+recall
+neo4j-driver
+neo4j-driver-core
+neo4j-driver-bolt-connection

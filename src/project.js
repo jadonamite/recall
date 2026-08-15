@@ -30,7 +30,7 @@ import { resolveProject } from './resolve.js';
 import { classify } from './windows.js';
 import { queryName, windowsOf, severityOf } from './advisory-history.js';
 import { rate } from './severity.js';
-import { Recall, TRAVERSAL_CYPHER } from './query.js';
+import { Recall, cypherFor, relTypeFor } from './query.js';
 
 const DATA = new URL('../data/', import.meta.url).pathname;
 const BOLT = process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687';
@@ -94,6 +94,7 @@ export async function backfillAdvisories(names, { concurrency = 4 } = {}) {
 
 /** Push a resolved project graph into HydraDB next to the seeded graph. */
 export async function upsert(graph) {
+  const relType = relTypeFor(graph.root);
   const map = JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
   const windows = ndjson('advisory-windows.ndjson');
 
@@ -163,11 +164,17 @@ export async function upsert(graph) {
       .map((e) => ({ f: map.packages[e.from], t: map.packages[e.to] }))
       .filter((r) => r.f !== undefined && r.t !== undefined)
       .map((r) => ({ f: neo4j.int(r.f), t: neo4j.int(r.t), rid: neo4j.int(r.f * 100_000 + r.t) }));
-    await batched(depRows, `
-      UNWIND $rows AS row
-      MATCH (s:Package {id: row.f}), (t:Package {id: row.t})
-      MERGE (s)-[r:DEPENDS_ON {id: row.rid}]->(t)
-    `);
+
+    // Twice: once into the shared DEPENDS_ON graph the global queries use, and
+    // once under a type private to this project so its traversal cannot be
+    // crowded out of `pathCount` by an unrelated project in the same store.
+    for (const type of ['DEPENDS_ON', relType]) {
+      await batched(depRows, `
+        UNWIND $rows AS row
+        MATCH (s:Package {id: row.f}), (t:Package {id: row.t})
+        MERGE (s)-[r:${type} {id: row.rid}]->(t)
+      `);
+    }
 
     await batched(advEdges, `
       UNWIND $rows AS row
@@ -180,7 +187,7 @@ export async function upsert(graph) {
   }
 
   writeFileSync(`${DATA}idmap.json`, JSON.stringify(map));
-  return { newPackages: newNodes.length, edges: graph.edges.length, exposed };
+  return { newPackages: newNodes.length, edges: graph.edges.length, exposed, relType };
 }
 
 // ------------------------------------------------------------------ report
@@ -193,7 +200,8 @@ export async function upsert(graph) {
  * chain is a direct dependency — the only thing the developer can actually
  * change. Grouping findings by that hop is what turns the wall into a list.
  */
-export async function report(graph, exposed, { maxLen = 10, limit = 2000, keepPaths = 40 } = {}) {
+export async function report(graph, exposed, { maxLen = 12, limit = 5000, keepPaths = 40, relType } = {}) {
+  const type = relType ?? relTypeFor(graph.root);
   const r = new Recall();
   const byDirect = new Map();
   const unreachable = [];
@@ -216,7 +224,7 @@ export async function report(graph, exposed, { maxLen = 10, limit = 2000, keepPa
 
       let paths;
       try {
-        paths = await r.recall(v.key, { maxLen, limit });
+        paths = await r.recall(v.key, { maxLen, limit, relType: type });
       } catch (err) {
         unreachable.push({ ...v, reason: err.message });
         continue;
@@ -286,7 +294,7 @@ export async function report(graph, exposed, { maxLen = 10, limit = 2000, keepPa
     fixes,
     details: details.sort((a, b) => b.worst.rank - a.worst.rank || b.pathCount - a.pathCount),
     unreachable,
-    query: TRAVERSAL_CYPHER,
+    query: cypherFor(type),
     warnings: graph.warnings ?? [],
   };
 }
@@ -310,14 +318,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
 
   await backfillAdvisories(graph.nodes.map((n) => n.name));
-  const { exposed, newPackages } = await upsert(graph);
+  const { exposed, newPackages, relType } = await upsert(graph);
   if (!asJson) console.log(`  ${newPackages} packages new to the graph · ${exposed.length} advisory hits\n`);
 
-  const out = await report(graph, exposed);
+  const out = await report(graph, exposed, { relType });
 
   if (asJson) {
     console.log(JSON.stringify(out, null, 2));
   } else {
+    if (!out.findings) {
+      console.log(`Nothing to recall. No version in this tree sits inside a known advisory window.`);
+      console.log(`  ${out.packages} packages checked against every advisory OSV has for their names.`);
+      process.exit(0);
+    }
+
     const sev = Object.entries(out.severities).filter(([, n]) => n > 0)
       .map(([k, n]) => `${n} ${k.toLowerCase()}`).join(' · ');
     console.log(`${out.findings} findings across ${out.exposedVersions} vulnerable versions`);
