@@ -1,0 +1,55 @@
+{
+  "ingestedAt": "2026-08-17",
+  "dev": true,
+  "seedNodes": 2270,
+  "seedEdges": 4557,
+  "unionPackages": 5392,
+  "unionEdges": 12279,
+  "sources": [
+    {
+      "name": "jitsi/jitsi-meet",
+      "url": "https://github.com/jitsi/jitsi-meet",
+      "root": "jitsi-meet@0.0.0",
+      "packages": 1920,
+      "edges": 3829,
+      "newPackages": 0,
+      "advisoryHits": 135
+    },
+    {
+      "name": "socketio/socket.io",
+      "url": "https://github.com/socketio/socket.io",
+      "root": "socket.io@0.0.0",
+      "packages": 1135,
+      "edges": 1976,
+      "newPackages": 0,
+      "advisoryHits": 124
+    },
+    {
+      "name": "mozilla/pdf.js",
+      "url": "https://github.com/mozilla/pdf.js",
+      "root": "pdf.js@0.0.0",
+      "packages": 829,
+      "edges": 1330,
+      "newPackages": 0,
+      "advisoryHits": 0
+    },
+    {
+      "name": "expressjs/expressjs.com",
+      "url": "https://github.com/expressjs/expressjs.com",
+      "root": "expressjs-website@0.0.0",
+      "packages": 954,
+      "edges": 1939,
+      "newPackages": 0,
+      "advisoryHits": 17
+    },
+    {
+      "name": "axios/axios",
+      "url": "https://github.com/axios/axios",
+      "root": "axios@1.19.0",
+      "packages": 667,
+      "edges": 1122,
+      "newPackages": 0,
+      "advisoryHits": 4
+    }
+  ]
+}

@@ -12,7 +12,9 @@
     "test": "node --test test/*.test.js",
     "ui": "node src/server.js",
     "recall": "node src/project.js",
-    "demo": "node src/build-demo.js"
+    "demo": "node src/build-demo.js",
+    "site": "node src/build-site.js",
+    "ingest:public": "node src/ingest-public.js"
   },
   "dependencies": {
     "neo4j-driver": "^6.2.0",

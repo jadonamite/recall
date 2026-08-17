@@ -1,0 +1,10 @@
+{
+  "note": "Public repositories whose committed package-lock.json forms part of Recall's shared graph. Fetched and ingested by src/ingest-public.js, so the graph is reproducible: anyone running the same command gets the same dependents. Private project scans never enter this graph.",
+  "sources": [
+    { "repo": "jitsi/jitsi-meet", "ref": "master" },
+    { "repo": "socketio/socket.io", "ref": "main" },
+    { "repo": "mozilla/pdf.js", "ref": "master" },
+    { "repo": "expressjs/expressjs.com", "ref": "gh-pages" },
+    { "repo": "axios/axios", "ref": "v1.x" }
+  ]
+}

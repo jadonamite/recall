@@ -31,6 +31,7 @@ import { classify } from './windows.js';
 import { queryName, windowsOf, severityOf } from './advisory-history.js';
 import { rate } from './severity.js';
 import { Recall, cypherFor, relTypeFor } from './query.js';
+import { batchedRun } from './bolt.js';
 
 const DATA = new URL('../data/', import.meta.url).pathname;
 const BOLT = process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687';
@@ -97,7 +98,7 @@ export async function backfillAdvisories(names, { concurrency = 4 } = {}) {
 // ------------------------------------------------------------------ upsert
 
 /** Push a resolved project graph into HydraDB next to the seeded graph. */
-export async function upsert(graph) {
+export async function upsert(graph, { extraRelTypes = [] } = {}) {
   const relType = relTypeFor(graph.root);
   const map = JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
   const windows = ndjson('advisory-windows.ndjson');
@@ -142,17 +143,8 @@ export async function upsert(graph) {
 
   const driver = neo4j.driver(BOLT, neo4j.auth.basic('token', TOKEN), { disableLosslessIntegers: true });
   const session = driver.session();
-  // Bolt failures surface as opaque driver errors with no hint which write threw,
-  // so every batch says what it was and where it stopped.
-  const batched = async (label, rows, cypher, size = BATCH) => {
-    for (let i = 0; i < rows.length; i += size) {
-      try {
-        await session.run(cypher, { rows: rows.slice(i, i + size) });
-      } catch (e) {
-        throw new Error(`${label}: rows ${i}\u2013${i + size} of ${rows.length} \u2014 ${e.message}`);
-      }
-    }
-  };
+  const batched = (label, rows, cypher, size = BATCH) =>
+    batchedRun(session, label, rows, cypher, { size });
 
   try {
     await batched('packages', newNodes.map((n) => ({
@@ -180,7 +172,7 @@ export async function upsert(graph) {
     // Twice: once into the shared DEPENDS_ON graph the global queries use, and
     // once under a type private to this project so its traversal cannot be
     // crowded out of `pathCount` by an unrelated project in the same store.
-    for (const type of ['DEPENDS_ON', relType]) {
+    for (const type of [...new Set(['DEPENDS_ON', relType, ...extraRelTypes])]) {
       await batched(`depends_on:${type}`, depRows, `
         UNWIND $rows AS row
         MATCH (s:Package {id: row.f}), (t:Package {id: row.t})

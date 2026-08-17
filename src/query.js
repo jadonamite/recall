@@ -82,27 +82,73 @@ export class Recall {
 
   /** Every package version carrying a live advisory. */
   async vulnerable() {
-    const r = await this.session.run(`
+    const r = await this.#retry(() => this.session.run(`
       MATCH (p:Package)-[:HAS_ADVISORY]->(a:Advisory)
       RETURN p.key AS pkg, a.osv AS osv, a.severity AS severity, a.summary AS summary
-    `);
+    `));
     return r.records.map((x) => x.toObject());
   }
 
+  /** True for the driver's payload-size packing fault (see bolt.js). */
+  static #isPacking(e) {
+    return e instanceof RangeError || /offset.*out of range/i.test(e?.message ?? '');
+  }
+
+  /** Retry a read across a fresh connection when the packing fault hits. */
+  async #retry(fn, tries = 3) {
+    let last;
+    for (let i = 0; i < tries; i++) {
+      try { return await fn(); } catch (e) {
+        last = e;
+        if (!Recall.#isPacking(e)) throw e;
+        await this.reset();
+      }
+    }
+    throw last;
+  }
+
+  /** Reopen the session — a connection that hit a packing fault stays unhappy. */
+  async reset() {
+    try { await this.session.close(); } catch { /* already gone */ }
+    this.session = this.driver.session();
+  }
+
   /**
-   * THE RECALL QUERY. Walk DEPENDS_ON edges backwards from a compromised
+   * THE RECALL QUERY. Walk dependency edges backwards from a compromised
    * package and return the actual chains that reach it.
    * @returns {Promise<{path: string[], depth: number}[]>}
    */
   async recall(key, { maxLen = 6, limit = 500, relType = 'DEPENDS_ON' } = {}) {
-    const r = await this.session.run(cypherFor(relType), {
-      v: this.id(key), maxLen: neo4j.int(maxLen), limit: neo4j.int(limit),
-    });
+    // The driver's packing fault (see bolt.js) hits reads as well as writes, and
+    // a read cannot be split. It clears on a fresh connection often enough that
+    // reconnecting is worth trying; when it does not, ask for fewer paths, since
+    // the fault tracks payload size. A reduced result is flagged by the caller's
+    // own path count rather than pretended to be complete.
+    let attemptLimit = limit;
+    let lastErr;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        return this.#paths(await this.session.run(cypherFor(relType), {
+          v: this.id(key), maxLen: neo4j.int(maxLen), limit: neo4j.int(attemptLimit),
+        }));
+      } catch (e) {
+        lastErr = e;
+        if (!Recall.#isPacking(e)) throw e;
+        await this.reset();
+        if (attempt >= 1) attemptLimit = Math.max(50, Math.floor(attemptLimit / 2));
+      }
+    }
+    throw new Error(`recall(${key}) failed after retries — ${lastErr?.message}`);
+  }
 
+  /**
+   * THE RECALL QUERY's result shaping. SSpaths walks outward from the
+   * compromised package, so each path is reversed to read the way a developer
+   * thinks: from their app, down to the bad thing.
+   */
+  #paths(r) {
     return r.records.map((rec) => {
       const p = rec.get('path');
-      // SSpaths walks outward from the compromised package; reverse it so the
-      // chain reads the way a developer thinks: from their app, down to the bad thing.
       const chain = [p.start.properties.key, ...p.segments.map((s) => s.end.properties.key)];
       return { path: chain.reverse(), depth: chain.length - 1 };
     }).sort((a, b) => a.depth - b.depth);

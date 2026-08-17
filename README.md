@@ -45,9 +45,9 @@ The result is alert fatigue — the defining failure of the category. Developers
 
 ## The web UI
 
-**Live demo → https://recall-jadonamites-projects.vercel.app**
+**Live → https://recall-brown.vercel.app**  ·  the tool itself at [`/app`](https://recall-brown.vercel.app/app/)
 
-That deployment is a **recorded scan**, and it says so on the page. Recall cannot run on a serverless host: the traversal needs a Bolt connection to a HydraDB node, resolution reads a lock file off disk, and a first scan of an unseen project queries OSV for hundreds of package names. So the demo is the real UI rendering a real scan — [jitsi/jitsi-meet](https://github.com/jitsi/jitsi-meet)'s committed lock file, 1,920 packages, **135 findings collapsed onto 40 upgrades** — computed locally and published with the page. Nothing is trimmed or invented, and anyone can re-run it.
+The landing page makes the argument with measured numbers; `/app` is the working tool, showing a **recorded scan** that says so on the page. Recall cannot run on a serverless host: the traversal needs a Bolt connection to a HydraDB node, resolution reads a lock file off disk, and a first scan of an unseen project queries OSV for hundreds of package names. So the demo is the real UI rendering a real scan — [jitsi/jitsi-meet](https://github.com/jitsi/jitsi-meet)'s committed lock file, 1,920 packages, **135 findings collapsed onto 40 upgrades** — computed locally and published with the page. Nothing is trimmed or invented, and anyone can re-run it.
 
 To run it live against your own project:
 
@@ -115,8 +115,13 @@ src/load.js              batched idempotent load into HydraDB over Bolt
 src/project.js           resolve → backfill → upsert → recall → report
 src/query.js             the graph queries + CLI
 src/server.js            zero-dependency local web UI
+src/ingest-public.js     public repos' lock files → the shared graph
+src/bolt.js              batched writes that survive the driver's packing fault
 src/build-demo.js        bake a real scan into a static, deployable page
-public/index.html        the UI, single file
+src/build-site.js        measure the landing page's dataset from the graph
+public/index.html        the tool, single file
+site/index.html          the landing page, single file
+scripts/hydradb.sh       start a local HydraDB node
 ```
 
 Building the static demo:

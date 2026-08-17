@@ -28,6 +28,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import neo4j from 'neo4j-driver';
 
+import { batchedRun } from './bolt.js';
+
 const DATA = new URL('../data/', import.meta.url).pathname;
 const BOLT = process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687';
 const TOKEN = process.env.HYDRA_TOKEN ?? 'local-development-token-32-bytes';
@@ -45,13 +47,13 @@ async function run() {
   const t0 = Date.now();
 
   const batched = async (label, rows, cypher) => {
-    let done = 0;
-    for (let i = 0; i < rows.length; i += BATCH) {
-      await session.run(cypher, { rows: rows.slice(i, i + BATCH) });
-      done += Math.min(BATCH, rows.length - i);
-      if (done % 2000 === 0 || done === rows.length) process.stdout.write(`\r  ${label}: ${done}/${rows.length}`);
-    }
-    process.stdout.write(`\r  ${label}: ${rows.length}/${rows.length}\n`);
+    const { splits } = await batchedRun(session, label, rows, cypher, {
+      size: BATCH,
+      onProgress: (done, total) => {
+        if (done % 2000 === 0 || done === total) process.stdout.write(`\r  ${label}: ${done}/${total}`);
+      },
+    });
+    process.stdout.write(`\r  ${label}: ${rows.length}/${rows.length}${splits ? ` (${splits} splits)` : ''}\n`);
   };
 
   try {
@@ -119,11 +121,16 @@ async function run() {
       if (f === undefined || t === undefined) continue;
       depRows.push({ f: neo4j.int(f), t: neo4j.int(t), rid: neo4j.int(f * 100_000 + t) });
     }
-    await batched('depends_on', depRows, `
-      UNWIND $rows AS row
-      MATCH (s:Package {id: row.f}), (t:Package {id: row.t})
-      MERGE (s)-[r:DEPENDS_ON {id: row.rid}]->(t)
-    `);
+    // DEPENDS_ON is the union of everything ever loaded, including projects that
+    // were scanned later. SEED_GRAPH is only ever this crawl, so a query about
+    // "the ecosystem" cannot accidentally answer with somebody's private tree.
+    for (const type of ['DEPENDS_ON', 'SEED_GRAPH']) {
+      await batched(`depends_on:${type}`, depRows, `
+        UNWIND $rows AS row
+        MATCH (s:Package {id: row.f}), (t:Package {id: row.t})
+        MERGE (s)-[r:${type} {id: row.rid}]->(t)
+      `);
+    }
 
     // ---- advisory edges (version-window aware) ----------------------------
     // Link an advisory to every ingested version of the affected package that
