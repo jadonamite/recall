@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  /* Midnight Settlement — ported from Binary/Delta so the two read as siblings.
+     act-blue is the only action colour; the semantic three carry severity and
+     are never used for decoration. */
+  --color-mid: #0b0f1a; /* ground */
+  --color-mid-2: #141b2e; /* raised surface */
+  --color-mid-3: #1e2840; /* borders / pressed */
+  --color-act: #3d74ff; /* action blue */
+  --color-act-soft: #7aa2ff; /* action text on dark tints */
+  --color-gold: #e4c87e; /* elevated severity */
+  --color-win: #31d3a2; /* clean / resolved */
+  --color-lose: #ff6b5e; /* critical */
+  --color-ice: #edf0f7; /* primary text */
+  --color-fog: #8e96ab; /* secondary text */
+
+  /* One face everywhere, including the "mono" slot — Bricolage Grotesque's
+     optical-size axis holds from 10px labels to display, and its tabular
+     numerals keep the measured figures aligned. */
+  --font-sans: var(--font-bricolage), system-ui, sans-serif;
+  --font-mono: var(--font-bricolage), system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-mid);
+  color: var(--color-ice);
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fixed backdrop — survives long pages and iOS scroll. Two cool washes, no
+   colour at the centre, so the panels are what carry the light. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(70rem 34rem at 12% -12%, rgba(61, 116, 255, 0.13), transparent 62%),
+    radial-gradient(52rem 30rem at 104% 2%, rgba(122, 162, 255, 0.07), transparent 60%),
+    var(--color-mid);
+}
+
+::selection {
+  background: var(--color-act);
+  color: var(--color-ice);
+}
+
+/* Fine grain. Frosted glass reads as plastic without it — the noise is what
+   makes a translucent panel feel like a surface rather than a flat tint. */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Isometric field — the substrate the block visuals sit on, as in the
+   reference layout. Drawn, not an image, so it stays crisp at any size. */
+.iso-field {
+  background-image:
+    linear-gradient(30deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(-30deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 26px;
+}
+
+/* Tabular numerals wherever figures are compared down a column. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}

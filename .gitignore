@@ -10,3 +10,9 @@ data/idmap.json
 # static demo build output (deployed to Vercel, not source)
 dist/
 .vercel/
+
+# Next.js site build
+site-next/node_modules/
+site-next/.next/
+site-next/out/
+site-next/public/site.json

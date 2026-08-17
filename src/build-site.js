@@ -30,6 +30,7 @@ import { rate } from './severity.js';
 const ROOT = new URL('../', import.meta.url).pathname;
 const DATA = `${ROOT}data/`;
 const DIST = `${ROOT}dist/`;
+const SITE_PUBLIC = `${ROOT}site-next/public/`;
 
 /**
  * How many recall-notice subjects the page offers, and the minimum reach a
@@ -160,22 +161,46 @@ async function main() {
     notices,
   };
 
-  mkdirSync(DIST, { recursive: true });
-  writeFileSync(`${DIST}site.json`, JSON.stringify(site));
-  console.log(`\ndist/site.json  ${(readFileSync(`${DIST}site.json`).length / 1024).toFixed(0)}K`);
-
-  // The landing page and the working tool ship together: / is the argument,
-  // /app is the thing itself.
-  cpSync(`${ROOT}site/index.html`, `${DIST}index.html`);
-  mkdirSync(`${DIST}app/`, { recursive: true });
-  const app = readFileSync(`${ROOT}public/index.html`, 'utf8');
-  writeFileSync(`${DIST}app/index.html`, app.replace(
-    '</head>', '<script>window.RECALL_DEMO = "../demo.json";</script>\n</head>'
-  ));
-  if (!existsSync(`${DIST}demo.json`)) {
-    console.warn('\n! dist/demo.json missing — run src/build-demo.js so /app has a scan to show');
+  // A trimmed consumer report travels with the page: the landing page needs the
+  // headline collapse and a sample chain per finding, not the full 111K report.
+  // The whole report stays available in the tool at /app.
+  let consumer = null;
+  if (existsSync(`${DIST}demo.json`)) {
+    const full = JSON.parse(readFileSync(`${DIST}demo.json`, 'utf8'));
+    const keep = new Set();
+    const fixes = full.fixes.slice(0, 10).map((f) => {
+      for (const k of f.via.slice(0, 6)) keep.add(k);
+      return { ...f, via: f.via.slice(0, 6) };
+    });
+    consumer = {
+      root: full.root,
+      sourceUrl: full.sourceUrl,
+      sourceLabel: full.sourceLabel,
+      packages: full.packages,
+      edges: full.edges,
+      findings: full.findings,
+      fixCount: full.fixes.length,
+      severities: full.severities,
+      fixes,
+      details: full.details
+        .filter((d) => keep.has(d.key))
+        .map((d) => ({ key: d.key, worst: d.worst, pathCount: d.pathCount, chain: d.paths?.[0] ?? d.shortest })),
+      // The wall, in full: it is the argument that nothing was filtered out.
+      wall: full.details.flatMap((d) =>
+        d.advisories.map((a) => [a.label, d.key, a.osv, String(a.summary ?? '').slice(0, 90)])),
+    };
+  } else {
+    console.warn('! dist/demo.json missing — run src/build-demo.js first; the site will omit the consumer act');
   }
-  console.log('dist/index.html, dist/app/index.html written');
+
+  const payload = { ...site, consumer };
+
+  mkdirSync(DIST, { recursive: true });
+  writeFileSync(`${DIST}site.json`, JSON.stringify(payload));
+  mkdirSync(SITE_PUBLIC, { recursive: true });
+  writeFileSync(`${SITE_PUBLIC}site.json`, JSON.stringify(payload));
+  const kb = (f) => (readFileSync(f).length / 1024).toFixed(0);
+  console.log(`\nsite.json  ${kb(`${DIST}site.json`)}K  →  dist/ and site-next/public/`);
 }
 
 main().catch((e) => { console.error(e.message ?? e); process.exit(1); });
