@@ -1,19 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  /* Midnight Settlement — ported from Binary/Delta so the two read as siblings.
-     act-blue is the only action colour; the semantic three carry severity and
-     are never used for decoration. */
-  --color-mid: #0b0f1a; /* ground */
-  --color-mid-2: #141b2e; /* raised surface */
-  --color-mid-3: #1e2840; /* borders / pressed */
-  --color-act: #3d74ff; /* action blue */
-  --color-act-soft: #7aa2ff; /* action text on dark tints */
-  --color-gold: #e4c87e; /* elevated severity */
-  --color-win: #31d3a2; /* clean / resolved */
-  --color-lose: #ff6b5e; /* critical */
-  --color-ice: #edf0f7; /* primary text */
-  --color-fog: #8e96ab; /* secondary text */
+  /* Recall's own branding. The token NAMES are Delta's structural slots — what
+     was ported from Delta is the system (surfaces, section rhythm, reveal,
+     one typeface), not its palette. Recall stays amber on near-black; a
+     supply-chain recall notice is a warning, not a fintech action. */
+  --color-mid: #0b0d10; /* ground */
+  --color-mid-2: #12151a; /* raised surface */
+  --color-mid-3: #1e232b; /* borders / pressed */
+  --color-act: #ffab3d; /* the one action colour */
+  --color-act-soft: #ffc16b; /* action text on dark tints */
+  --color-gold: #ff9142; /* elevated severity */
+  --color-win: #7fc8a9; /* clean / resolved */
+  --color-lose: #ff5f56; /* critical */
+  --color-ice: #e8ecf1; /* primary text */
+  --color-fog: #98a2b0; /* secondary text */
 
   /* One face everywhere, including the "mono" slot — Bricolage Grotesque's
      optical-size axis holds from 10px labels to display, and its tabular
@@ -42,14 +43,14 @@ body::before {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(70rem 34rem at 12% -12%, rgba(61, 116, 255, 0.13), transparent 62%),
-    radial-gradient(52rem 30rem at 104% 2%, rgba(122, 162, 255, 0.07), transparent 60%),
+    radial-gradient(70rem 34rem at 12% -12%, rgba(255, 171, 61, 0.075), transparent 62%),
+    radial-gradient(52rem 30rem at 104% 2%, rgba(90, 140, 255, 0.05), transparent 60%),
     var(--color-mid);
 }
 
 ::selection {
   background: var(--color-act);
-  color: var(--color-ice);
+  color: #241701;
 }
 
 /* Fine grain. Frosted glass reads as plastic without it — the noise is what

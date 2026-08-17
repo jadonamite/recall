@@ -26,10 +26,10 @@ export function Panel({
     <div
       className={cn(
         "grain group relative overflow-hidden rounded-[1.75rem]",
-        "bg-[linear-gradient(145deg,rgba(255,255,255,0.075)_0%,rgba(20,27,46,0.75)_38%,rgba(11,15,26,0.6)_100%)]",
+        "bg-[linear-gradient(145deg,rgba(255,255,255,0.07)_0%,rgba(18,21,26,0.78)_38%,rgba(11,13,16,0.62)_100%)]",
         "ring-1 ring-inset ring-white/[0.09]",
         interactive &&
-          "transition-[transform,box-shadow] duration-500 hover:-translate-y-1 hover:shadow-[0_24px_70px_-30px_rgba(61,116,255,0.55)]",
+          "transition-[transform,box-shadow] duration-500 hover:-translate-y-1 hover:shadow-[0_24px_70px_-30px_rgba(255,171,61,0.4)]",
         className,
       )}
     >
@@ -122,7 +122,7 @@ export function Sev({ label, score }: { label: string; score?: number | null }) 
       : label === "HIGH"
         ? "text-gold ring-gold/35 bg-gold/10"
         : label === "MEDIUM"
-          ? "text-act-soft ring-act/35 bg-act/10"
+          ? "text-[#ffd479] ring-[#ffd479]/30 bg-[#ffd479]/10"
           : label === "LOW"
             ? "text-win ring-win/30 bg-win/10"
             : "text-fog ring-white/10 bg-white/[0.03]";

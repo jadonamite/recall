@@ -5,6 +5,8 @@ import RecallNotice from "@/components/RecallNotice";
 import WallOrRecall from "@/components/WallOrRecall";
 import Blocks from "@/components/Blocks";
 import BuiltOn from "@/components/BuiltOn";
+import HeroTerminal from "@/components/HeroTerminal";
+import { Terminal, Prompt, Out } from "@/components/Terminal";
 import { IconArrow, IconShield, IconTerminal } from "@/components/icons";
 import { site, num } from "@/lib/data";
 
@@ -79,6 +81,11 @@ export default function Home() {
             </a>
           </div>
         </Reveal>
+        {c && (
+          <Reveal delay={0.24} className="mt-14">
+            <HeroTerminal data={c} />
+          </Reveal>
+        )}
       </section>
 
       {/* Proof band — tight, no card chrome */}
@@ -209,7 +216,7 @@ export default function Home() {
           </p>
         </Reveal>
         <Reveal delay={0.16} className="mt-10">
-          <Panel className="p-7 lg:p-9">
+          <Terminal title="the traversal, verbatim — HydraDB over Bolt">
             <pre className="overflow-x-auto font-mono text-[12.5px] leading-relaxed text-fog">
               {site.query.split("relDirection: 'incoming'").map((part, i, arr) => (
                 <span key={i}>
@@ -222,7 +229,7 @@ export default function Home() {
                 </span>
               ))}
             </pre>
-          </Panel>
+          </Terminal>
         </Reveal>
         <Reveal delay={0.2}>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
@@ -305,12 +312,13 @@ export default function Home() {
               Read the source <IconArrow className="h-4 w-4 -rotate-45" />
             </a>
           </div>
-          <div className="mx-auto mt-9 max-w-md overflow-x-auto rounded-2xl bg-mid/70 p-4 text-left ring-1 ring-inset ring-white/[0.06]">
-            <pre className="font-mono text-[12px] leading-relaxed text-fog">
-              git clone github.com/jadonamite/recall{"\n"}
-              npm install &amp;&amp; npm run load{"\n"}
-              <span className="text-act-soft">npm run recall ~/code/your-app</span>
-            </pre>
+          <div className="mx-auto mt-10 max-w-lg text-left">
+            <Terminal title="bash — one step, the graph ships with the repo">
+              <Prompt>git clone github.com/jadonamite/recall</Prompt>
+              <Prompt>npm install &amp;&amp; npm run load</Prompt>
+              <Prompt>npm run recall ~/code/your-app</Prompt>
+              <Out className="mt-2">→ your findings, collapsed onto their upgrades</Out>
+            </Terminal>
           </div>
         </Panel>
       </Reveal>
