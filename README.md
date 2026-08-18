@@ -34,6 +34,11 @@ worst chains:
 
 ![The recall — findings collapsed onto the direct dependencies they enter through](docs/ui-recall.png)
 
+**Start here** — [what it does](#why-the-flat-list-fails) · [live demo](https://recall-brown.vercel.app)
+· [**how HydraDB is used**](#how-hydradb-is-used) · [run it yourself](#run)
+· [attribution](#attribution) · [license](#license) (MIT).
+The traversal is `src/query.js`; the report that wraps it is `src/project.js`.
+
 ## Why the flat list fails
 
 `npm audit` on a real project prints hundreds of findings with two fatal properties:
@@ -74,7 +79,67 @@ The lock-file path matters more than it sounds. npm's resolution is positional: 
 
 When there is no lock file, the report says *"resolved as npm would install today"* on its face rather than quietly implying it knows what you are running.
 
-## The queries
+## How HydraDB is used
+
+Recall is a graph query wearing a CLI. HydraDB is not a cache or a side index —
+it holds the bill of materials and answers the recall itself. Take it out and
+there is no product left.
+
+### The graph
+
+| Element | Shape |
+|---|---|
+| `(:Package)` | `id` · `key` = `name@version` · `name` · `version` · `seed` |
+| `(:Advisory)` | `id` · `osv` (GHSA/CVE) · `severity` · `summary` |
+| `[:DEPENDS_ON]` | every dependency edge ever loaded — the union graph |
+| `[:SEED_GRAPH]` | the committed crawl only, so a question about the ecosystem cannot be answered with somebody's scanned project |
+| `[:IN_<ROOT>]` | one type per scanned project, carrying that project's tree alone |
+| `[:HAS_ADVISORY]` | version → advisory, drawn only where that concrete version falls inside a compromised window (`src/windows.js`) |
+
+### Writing it
+
+`src/load.js` (the committed dataset) and `src/project.js` (a scanned project),
+both batched through `src/bolt.js`. HydraDB rejects properties folded into a
+`MERGE` pattern, so every upsert is MERGE-by-id followed by `SET`:
+
+```cypher
+UNWIND $rows AS row
+MERGE (n {id: row.id})
+SET n:Package, n.key = row.key, n.name = row.name,
+    n.version = row.version, n.seed = row.seed
+```
+
+Node ids must be non-negative integers *and* integer-typed on the wire — so
+package keys live in a `key` property with `data/idmap.json` translating, and
+every id crosses the wire wrapped in `neo4j.int()`.
+
+### The read that is the product
+
+From `src/query.js`, exported verbatim so the UI can show the query that
+produced what is on screen rather than a prettified retelling of it:
+
+```cypher
+CALL algo.SSpaths({
+  sourceNode: $v,
+  relTypes: ['DEPENDS_ON'],
+  relDirection: 'incoming',
+  maxLen: $maxLen,
+  pathCount: $limit
+})
+YIELD path RETURN path
+```
+
+`relDirection: 'incoming'` walks the dependency edges **backwards** — from the
+compromised version up through everything that ships it. That one parameter is
+the recall. Paths return as `{start, segments, end, length}` and are reversed in
+code so each chain reads app-first.
+
+Every question this tool asks is a path question, which is why it is a graph
+and not a table: a relational schema answers these with recursive CTEs that fall
+over at depth, and a vector store cannot express them at all, because **"reaches"
+is not a distance**.
+
+### The four queries
 
 | Query | Question | Mechanism |
 |---|---|---|
@@ -83,9 +148,21 @@ When there is no lock file, the report says *"resolved as npm would install toda
 | `blast <pkg>` | How far does it reach? | reachable subgraph + depth profile |
 | `cuts <pkg>` | What do I actually fix? | rank by paths severed per upgrade |
 
-The first four are `src/query.js` subcommands, against the whole graph. `src/project.js` runs the same traversal scoped to one real project's root, which is the form the UI uses.
+All four are `src/query.js` subcommands, against the whole graph. `src/project.js` runs the same traversal scoped to one real project's root, which is the form the UI uses.
 
-Every one is a path query. A relational schema answers them with recursive CTEs that fall over at depth; a vector store cannot express them at all, because **"reaches" is not a distance**.
+### The Cypher subset, and what it shaped
+
+HydraDB speaks a deliberately narrow OpenCypher subset. Each of these cost a
+debugging round; between them they shaped the loader and every query:
+
+- auto-commit `RUN` only — explicit transactions are rejected
+- node ids are **non-negative integers**, so package keys live in a `key` property behind an id map
+- parameters must be integer-typed on the wire (`neo4j.int()`), or they arrive as floats and are refused
+- vertex upsert is `MERGE`-by-id followed by `SET`; folding properties into the `MERGE` pattern is rejected
+- `SET` values must read from the row map — a literal in an `UNWIND` write is rejected
+- no `IN`, `CONTAINS`, `IS NULL`, or `RETURN *`
+- reverse variable-length patterns are unsupported, so the reverse traversal runs as the native `algo.SSpaths` procedure with `relDirection: 'incoming'` — that one parameter *is* the recall
+- `algo.SSpaths`'s `pathCount` caps returned paths across the whole store, so each scanned project's edges are also written under a relationship type private to that project. Without it, one project's paths can crowd out another's and a genuinely reachable vulnerability reads as unreachable — which is exactly the silent false negative this tool exists to avoid.
 
 ## Version windows
 
@@ -120,7 +197,8 @@ src/bolt.js              batched writes that survive the driver's packing fault
 src/build-demo.js        bake a real scan into a static, deployable page
 src/build-site.js        measure the landing page's dataset from the graph
 public/index.html        the tool, single file
-site/index.html          the landing page, single file
+site-next/                the landing page — a separate Next.js app,
+                         not required to run anything above
 scripts/hydradb.sh       start a local HydraDB node
 ```
 
@@ -133,6 +211,23 @@ node src/build-demo.js <dir-or-lockfile> --dev --source <repo-url>
 
 ## Run
 
+### Requirements
+
+| Need | Version | Why |
+|---|---|---|
+| **Node.js** | ≥ 20 · built and tested on 24.14 | ESM, `node --test`, built-in `fetch` |
+| **npm** | any current | two runtime dependencies, no build step |
+| **A HydraDB node** | reachable over Bolt, default `127.0.0.1:7687` | everything except `npm test` |
+| **Network** | only to scan a project the graph has not seen, or to rebuild the dataset | the committed dataset and all 37 tests run offline |
+
+Runtime dependencies are `neo4j-driver` (Bolt client — HydraDB speaks Bolt) and
+`semver`. That is the whole list: `src/server.js` uses only Node's standard
+library and `public/index.html` is a single file with no bundler. The landing
+page under `site-next/` is a separate Next.js app with its own `package.json`
+and nothing in `src/` depends on it.
+
+### Quick start
+
 The crawled dataset is committed — 2,270 packages, 4,557 edges and 979 advisory
 windows in `data/` — so there is no waiting on a crawl to see this work.
 
@@ -140,6 +235,7 @@ windows in `data/` — so there is no waiting on a crawl to see this work.
 npm install
 npm test                            # 37 tests, no network, no database
 
+scripts/hydradb.sh                  # start the graph node (see below)
 npm run load                        # load the committed graph into HydraDB (~2s)
 npm run recall ~/code/my-app        # the recall, on a real project
 npm run ui                          # the same thing, in a browser
@@ -151,9 +247,26 @@ node src/query.js cuts   brace-expansion@1.1.12
 
 Rebuilding the dataset from scratch is `node src/ingest.js` then `node src/advisory-history.js`; both are resume-safe and take a while.
 
+### Environment
+
+Nothing is required — every variable has a working default, and there is no
+`.env` file to create.
+
+| Variable | Default | Read by |
+|---|---|---|
+| `HYDRA_BOLT` | `bolt://127.0.0.1:7687` | every script that touches the graph |
+| `HYDRA_TOKEN` | `local-development-token-32-bytes` | the same — must match the node's `GRAPH_AUTH_TOKEN_FILE` |
+| `PORT` | `7676` | `npm run ui` |
+| `HYDRA_PORT` | `7687` | `scripts/hydradb.sh` |
+| `HYDRA_BIN` | `graph-node` on `PATH` | `scripts/hydradb.sh` — a `graph-node` binary |
+| `HYDRA_ROOTFS` | — | `scripts/hydradb.sh` — an unpacked image rootfs, run through its own loader (what you need without Docker or root) |
+
 ### Running HydraDB
 
-Everything above needs a HydraDB node on `bolt://127.0.0.1:7687` (override with `HYDRA_BOLT` / `HYDRA_TOKEN`, which default to that address and to the token below).
+`scripts/hydradb.sh` starts a node on `127.0.0.1:7687` with the settings below
+and waits for the port; `scripts/hydradb.sh --fresh` wipes the store first.
+There are no prebuilt HydraDB releases, so point it at a binary with `HYDRA_BIN`
+or at an unpacked `ghcr.io/hydra-db/hydradb` image with `HYDRA_ROOTFS`.
 
 This is the exact environment the node used for every number in this README — the binary came out of `ghcr.io/hydra-db/hydradb`, run directly rather than under a container runtime, because this machine has neither Docker nor root:
 
@@ -175,18 +288,12 @@ Under Docker the same variables apply, with `-p 7687:7687` and the paths pointin
 
 `RUST_MIN_STACK=33554432` is **not optional** — without it the node starts, serves `/readyz`, and then aborts on the first traversal.
 
-### Notes on the store
-
-HydraDB speaks a deliberately narrow OpenCypher subset. What the loader and queries are shaped by:
-
-- auto-commit `RUN` only — explicit transactions are rejected
-- node ids are **non-negative integers**, so package keys live in a `key` property behind an id map
-- parameters must be integer-typed on the wire (`neo4j.int()`), or they arrive as floats and are refused
-- vertex upsert is `MERGE`-by-id followed by `SET`; folding properties into the `MERGE` pattern is rejected
-- `SET` values must read from the row map — a literal in an `UNWIND` write is rejected
-- no `IN`, `CONTAINS`, `IS NULL`, or `RETURN *`
-- reverse variable-length patterns are unsupported, so the reverse traversal runs as the native `algo.SSpaths` procedure with `relDirection: 'incoming'` — that one parameter *is* the recall
-- `algo.SSpaths`'s `pathCount` caps returned paths across the whole store, so each scanned project's edges are also written under a relationship type private to that project. Without it, one project's paths can crowd out another's and a genuinely reachable vulnerability reads as unreachable — which is exactly the silent false negative this tool exists to avoid.
+One limit worth knowing before you rely on a local store: `CLOUD_PROVIDER=local`
+puts SlateDB on `LocalFileSystem`, which does not implement conditional put
+(`put_opts` with `PutMode::Update`). Reads keep working, so it looks healthy —
+but once the store has taken enough writes to need a compare-and-swap, every
+write fails and the node does not recover. Reload with `--fresh`, or point
+`CLOUD_PROVIDER` / `LOCAL_PATH` at a real S3-compatible store for sustained use.
 
 ## What this does not claim
 
@@ -199,10 +306,48 @@ HydraDB speaks a deliberately narrow OpenCypher subset. What the loader and quer
 
 The Bolt driver throws `RangeError: offset out of range` while packing large writes against this server, and throws it asynchronously enough to escape a `try`/`catch` and take the process with it. It scales with payload bytes, so writes are batched conservatively (25 rows for anything carrying strings, 100 for id-only rows) and the UI server survives it rather than dying mid-scan. It is a driver/server interaction, not a data problem — the same rows succeed in smaller batches.
 
-## Data sources
+## Attribution
 
-[deps.dev](https://deps.dev) for resolved dependency graphs · [OSV](https://osv.dev) for advisories. Both public, no key required.
+Everything in `src/`, `test/`, `public/`, `scripts/` and `site-next/src/` was
+written for this project. What it stands on:
+
+**Database and runtime**
+
+- **[HydraDB](https://github.com/hydra-db/hydradb)** — the graph store, and the
+  reason the recall query exists in this form. Run from the published
+  `ghcr.io/hydra-db/hydradb` image. `algo.SSpaths` is HydraDB's own procedure.
+- **[neo4j-driver](https://github.com/neo4j/neo4j-javascript-driver)** 6.2.0 ·
+  Apache-2.0 — Bolt client.
+- **[semver](https://github.com/npm/node-semver)** 7.8.5 · ISC — version and
+  range comparison behind the advisory windows.
+
+**Data and specifications**
+
+- **[deps.dev](https://deps.dev)** (Google) — resolved dependency graphs for the
+  seed crawl and for manifest-mode resolution. Public API, no key.
+- **[OSV](https://osv.dev)** (Google / OpenSSF) — advisories and affected-version
+  ranges via the public `api.osv.dev`. Advisory ids and summaries are reproduced
+  as returned, unedited.
+- **[CVSS v3.1 specification](https://www.first.org/cvss/v3.1/specification-document)**
+  (FIRST) — `src/severity.js` implements the base-score formula and is tested
+  against the specification's own worked examples.
+- **[jitsi/jitsi-meet](https://github.com/jitsi/jitsi-meet)** · Apache-2.0 — its
+  committed `package-lock.json` is the subject of the published demo scan. A
+  public project was chosen deliberately, so anyone can re-run it and check.
+
+**Landing page** (`site-next/`, not needed to run the tool)
+
+- Next.js, React, Tailwind CSS, motion, clsx, tailwind-merge — all MIT.
+- **[simple-icons](https://github.com/simple-icons/simple-icons)** · CC0-1.0 —
+  brand marks.
+- **Bricolage Grotesque** · SIL Open Font License 1.1 — served through
+  `next/font`.
 
 ## License
 
-MIT
+**MIT** — see [LICENSE](LICENSE). Copyright (c) 2026 jadonamite.
+
+The dataset committed under `data/` is derived from deps.dev and OSV, both
+public sources, and is redistributed here so the repository runs without a
+crawl. Third-party dependencies keep their own licenses, listed above; none are
+copyleft.
