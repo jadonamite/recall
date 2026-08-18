@@ -292,8 +292,15 @@ One limit worth knowing before you rely on a local store: `CLOUD_PROVIDER=local`
 puts SlateDB on `LocalFileSystem`, which does not implement conditional put
 (`put_opts` with `PutMode::Update`). Reads keep working, so it looks healthy —
 but once the store has taken enough writes to need a compare-and-swap, every
-write fails and the node does not recover. Reload with `--fresh`, or point
-`CLOUD_PROVIDER` / `LOCAL_PATH` at a real S3-compatible store for sustained use.
+write fails and the node does not recover. Recover with `scripts/hydradb.sh
+--fresh` followed by `npm run load`, or point `CLOUD_PROVIDER` / `LOCAL_PATH` at
+a real S3-compatible store for sustained use.
+
+`--fresh` deletes `data/idmap.json` along with the store, and it has to: the
+idmap holds the integer node id assigned to each package key, and a scan skips
+upserting any package already listed there. An idmap that outlives its store
+sends the next scan's edges to vertices that no longer exist. `npm run load`
+rebuilds both together.
 
 ## What this does not claim
 

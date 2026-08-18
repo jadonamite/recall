@@ -33,8 +33,14 @@ PORT="${HYDRA_PORT:-7687}"
 TOKEN="${HYDRA_TOKEN:-local-development-token-32-bytes}"
 
 if [[ "${1:-}" == "--fresh" ]]; then
-  echo "wiping $H/store"
+  # data/idmap.json goes with it. It maps package keys to the integer node ids
+  # HydraDB requires, and project.js skips upserting any package already in it —
+  # so an idmap that outlives its store makes the next scan write edges to
+  # vertices that no longer exist ("MATCH endpoint vertex N ... does not exist").
+  # Wipe them together; `npm run load` rebuilds both.
+  echo "wiping $H/store and data/idmap.json"
   rm -rf "$H/store" "$H/cache"
+  rm -f "$HERE/data/idmap.json"
 fi
 
 mkdir -p "$H/store" "$H/cache"
