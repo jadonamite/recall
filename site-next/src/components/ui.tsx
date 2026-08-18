@@ -49,19 +49,19 @@ export function Panel({
 }
 
 /**
- * Recall's wordmark, built the way Binary's and Delta's are — split across two
- * colours so the family reads as one house.
+ * Recall's lockup: the mark, then the wordmark split across two colours the way
+ * Binary's and Delta's are, so the family reads as one house. The mark is four
+ * slabs with the middle one severed — the cut this tool exists to find.
  */
 export function RecallMark({ className = "" }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "select-none text-lg font-black italic leading-none tracking-tight",
-        className,
-      )}
-    >
-      <span className="text-ice">RE</span>
-      <span className="text-act">CALL</span>
+    <span className={cn("inline-flex select-none items-center gap-2.5", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/mark.png" alt="" aria-hidden className="h-[30px] w-auto" />
+      <span className="text-lg font-black italic leading-none tracking-tight whitespace-nowrap">
+        <span className="text-ice">RE</span>
+        <span className="text-act">CALL</span>
+      </span>
     </span>
   );
 }

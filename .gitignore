@@ -16,3 +16,7 @@ site-next/node_modules/
 site-next/.next/
 site-next/out/
 site-next/public/site.json
+
+# font/logo build inputs — the outputs are embedded or committed
+.fonts/
+.assets/

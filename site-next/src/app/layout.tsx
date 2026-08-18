@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque } from "next/font/google";
+import { Bricolage_Grotesque, Geist_Mono, Dancing_Script } from "next/font/google";
 import "./globals.css";
 
-// One face everywhere: Bricolage Grotesque — the same lockup Binary and Delta
-// use, so the three read as one house. Its optical-size axis holds from 10px
-// tracking labels up to display, and tabular numerals keep the measured
-// figures aligned down a column.
+// Three faces, the same set the rest of the house uses. Bricolage Grotesque
+// carries the voice — the same lockup Binary and Delta use, so they read as one
+// house; its optical-size axis holds from 10px tracking labels up to display,
+// and its tabular numerals keep measured figures aligned down a column.
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
+  subsets: ["latin"],
+});
+
+/** Everything that is code or machine output — Cypher, transcripts, versions. */
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+/** Used sparingly, for human asides — never for data or navigation. */
+const dancingScript = Dancing_Script({
+  variable: "--font-script-face",
   subsets: ["latin"],
 });
 
@@ -21,7 +33,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${bricolage.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${bricolage.variable} ${geistMono.variable} ${dancingScript.variable} h-full antialiased`}
+    >
       <body className="min-h-full">{children}</body>
     </html>
   );

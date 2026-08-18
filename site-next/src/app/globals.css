@@ -16,11 +16,12 @@
   --color-ice: #e8ecf1; /* primary text */
   --color-fog: #98a2b0; /* secondary text */
 
-  /* One face everywhere, including the "mono" slot — Bricolage Grotesque's
-     optical-size axis holds from 10px labels to display, and its tabular
-     numerals keep the measured figures aligned. */
+  /* Bricolage for voice, Geist Mono for machine output, Dancing Script for
+     the occasional human aside. Bricolage's optical-size axis holds from 10px
+     labels to display; the mono keeps Cypher and transcripts honest. */
   --font-sans: var(--font-bricolage), system-ui, sans-serif;
-  --font-mono: var(--font-bricolage), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-script: var(--font-script-face), "Segoe Script", cursive;
 }
 
 html {
@@ -72,6 +73,14 @@ body::before {
     linear-gradient(30deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     linear-gradient(-30deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
   background-size: 44px 26px;
+}
+
+/* The script face, used sparingly for human asides. */
+.script {
+  font-family: var(--font-script), cursive;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  line-height: 1.25;
 }
 
 /* Tabular numerals wherever figures are compared down a column. */

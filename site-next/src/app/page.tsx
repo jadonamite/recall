@@ -292,6 +292,9 @@ export default function Home() {
             Software has a bill of materials.
             <span className="text-fog"> Now it has the query.</span>
           </h2>
+          <p className="script mx-auto mt-6 text-2xl text-act-soft">
+            Nobody had to invent this — only implement it.
+          </p>
           <p className="mx-auto mt-6 max-w-lg text-[15px] leading-relaxed text-ice/65">
             Open source, MIT, and the crawled graph ships with the repo — so it
             runs in one step instead of after an afternoon of crawling.

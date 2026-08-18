@@ -347,8 +347,14 @@ written for this project. What it stands on:
 - Next.js, React, Tailwind CSS, motion, clsx, tailwind-merge — all MIT.
 - **[simple-icons](https://github.com/simple-icons/simple-icons)** · CC0-1.0 —
   brand marks.
-- **Bricolage Grotesque** · SIL Open Font License 1.1 — served through
-  `next/font`.
+
+**Typefaces** — all three under the SIL Open Font License 1.1, served through
+`next/font` on the landing page and embedded as latin-subset woff2 inside
+`public/index.html` so the tool looks the same offline as it does deployed.
+
+- **Bricolage Grotesque** — the voice: headings, labels, figures.
+- **Geist Mono** — code and machine output: Cypher, transcripts, versions.
+- **Dancing Script** — human asides, used sparingly and never for data.
 
 ## License
 
