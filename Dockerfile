@@ -14,6 +14,11 @@ FROM node:22-bookworm-slim AS node
 
 FROM ghcr.io/hydra-db/hydradb:latest
 
+# The published image runs as uid 10001 and entrypoints straight into
+# graph-node. Build as root, then hand the app back to that uid — and clear the
+# entrypoint, or every CMD below arrives as arguments to the database.
+USER root
+
 # glibc is backward compatible, so a node built against Debian 12 runs on
 # Ubuntu 24.04. npm is a script in node_modules, hence both copies.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
@@ -41,5 +46,11 @@ ENV RECALL_HOSTED=1 \
     HYDRA_STORE=/tmp/hydradb \
     PORT=8080
 
+# data/ is written at runtime: the loader rewrites the id map, and a scan appends
+# whatever advisory history OSV had that the crawl did not.
+RUN chown -R 10001:10001 /app
+USER 10001:10001
+
 EXPOSE 8080
+ENTRYPOINT []
 CMD ["./scripts/serve.sh"]

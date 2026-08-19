@@ -4112,3 +4112,6 @@ yeast
 @socket.io/clustered-engine
 @socket.io/postgres-emitter
 @socket.io/redis-streams-emitter
+my-app
+opensea-js
+umi
