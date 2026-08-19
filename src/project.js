@@ -257,14 +257,23 @@ export async function report(graph, exposed, {
       v.advisories.sort((a, b) => b.rank - a.rank || (b.score ?? 0) - (a.score ?? 0));
       const worst = v.advisories[0];
 
-      let paths;
-      try {
-        paths = await r.recall(v.key, { maxLen, limit, relType: type });
-      } catch (err) {
-        unreachable.push({ ...v, reason: err.message });
-        continue;
+      // The tree was written on one session and is being read on another, and
+      // the store does not always show those writes immediately. That surfaces
+      // as a traversal finding no path from the root — a *silent false
+      // negative*, which for this tool is the worst answer available: it reads
+      // as "you are clean". So an empty result is retried before it is believed.
+      let paths = [];
+      let fromRoot = [];
+      let failed;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt) await new Promise((ok) => setTimeout(ok, 250 * attempt));
+        try {
+          paths = await r.recall(v.key, { maxLen, limit, relType: type });
+        } catch (err) { failed = err.message; break; }
+        fromRoot = paths.filter((p) => p.path[0] === graph.root);
+        if (fromRoot.length) break;
       }
-      const fromRoot = paths.filter((p) => p.path[0] === graph.root);
+      if (failed) { unreachable.push({ ...v, reason: failed }); continue; }
       if (!fromRoot.length) { unreachable.push({ ...v, reason: 'no path from project root' }); continue; }
 
       const shortest = fromRoot.reduce((a, b) => (b.depth < a.depth ? b : a));
