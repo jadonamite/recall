@@ -139,11 +139,12 @@ export async function upsert(graph, {
   let nextPkg = Math.max(-1, ...Object.values(map.packages)) + 1;
   let nextAdv = Math.max(ADV_BASE - 1, ...Object.values(map.advisories)) + 1;
 
-  const newNodes = [];
+  const nodesToUpsert = [];
   for (const n of graph.nodes) {
-    if (map.packages[n.key] !== undefined) continue;
-    map.packages[n.key] = nextPkg++;
-    newNodes.push(n);
+    if (map.packages[n.key] === undefined) {
+      map.packages[n.key] = nextPkg++;
+    }
+    nodesToUpsert.push(n);
   }
 
   // Advisory edges for EVERY node in the tree, not just the new ones — a
@@ -152,13 +153,15 @@ export async function upsert(graph, {
   const advEdges = [];
   const exposed = [];
   let rel = PROJ_REL_BASE;
-  const newAdvisories = [];
+  const advisoriesToUpsert = new Map();
   for (const n of graph.nodes) {
     for (const w of byName.get(n.name) ?? []) {
       if (classify(n.version, w) !== 'inside') continue;
       if (map.advisories[w.id] === undefined) {
         map.advisories[w.id] = nextAdv++;
-        newAdvisories.push(w);
+      }
+      if (!advisoriesToUpsert.has(w.id)) {
+        advisoriesToUpsert.set(w.id, w);
       }
       advEdges.push({
         f: neo4j.int(map.packages[n.key]), t: neo4j.int(map.advisories[w.id]),
@@ -174,7 +177,7 @@ export async function upsert(graph, {
     batchedRun(session, label, rows, cypher, { size });
 
   try {
-    await batched('packages', newNodes.map((n) => ({
+    await batched('packages', nodesToUpsert.map((n) => ({
       id: neo4j.int(map.packages[n.key]), key: n.key, name: n.name, version: n.version, seed: false,
     })), `
       UNWIND $rows AS row
@@ -182,7 +185,7 @@ export async function upsert(graph, {
       SET n:Package, n.key = row.key, n.name = row.name, n.version = row.version, n.seed = row.seed
     `, BATCH_TEXT);
 
-    await batched('advisories', newAdvisories.map((w) => ({
+    await batched('advisories', [...advisoriesToUpsert.values()].map((w) => ({
       id: neo4j.int(map.advisories[w.id]), osv: w.id,
       severity: String(w.severity ?? 'UNKNOWN'), summary: String(w.summary ?? '').slice(0, 300),
     })), `
