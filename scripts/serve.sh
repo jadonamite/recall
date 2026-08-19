@@ -19,8 +19,15 @@
 set -uo pipefail
 
 H="${HYDRA_STORE:-/tmp/hydradb}"
-BOLT_PORT=7687
+BOLT_PORT="${HYDRA_PORT:-7687}"
 TOKEN="${HYDRA_TOKEN:-container-local-token-32-bytes-min}"
+
+# Export what the database is actually configured with, rather than leaving the
+# Node side to fall back to its own default. The two defaults differ, and a
+# mismatch surfaces as "invalid credentials" from the loader — a confusing way
+# to say the token file and the client disagree.
+export HYDRA_TOKEN="$TOKEN"
+export HYDRA_BOLT="${HYDRA_BOLT:-bolt://127.0.0.1:$BOLT_PORT}"
 
 rm -rf "$H"
 mkdir -p "$H/store" "$H/cache"
@@ -44,17 +51,16 @@ env \
   graph-node &
 HYDRA_PID=$!
 
-# Exit if the graph node dies at any point. A container that keeps serving HTTP
-# with a dead database behind it is worse than one the platform restarts.
-watch_hydra() {
-  wait "$HYDRA_PID"
-  echo "!! graph-node exited ($?) — bringing the container down" >&2
-  kill 0
-}
-watch_hydra &
-
+# Liveness after startup is the health check's job, not a watchdog's: /healthz
+# opens a Bolt session and fails if the graph node is gone, so an instance whose
+# database died is already unhealthy and gets restarted. An earlier version
+# supervised it here with `wait` from a background function — which cannot work,
+# because that runs in a subshell where the node is not a child. `wait` returned
+# 127 instantly, the handler believed the database had crashed, and its `kill 0`
+# then took down the whole process group. The database was killed by its own
+# watchdog, one second after it started.
 echo "── waiting for bolt on 127.0.0.1:$BOLT_PORT"
-for i in $(seq 1 60); do
+for i in $(seq 1 90); do
   if node -e "
     const net = require('node:net');
     const s = net.connect($BOLT_PORT, '127.0.0.1');
@@ -64,11 +70,25 @@ for i in $(seq 1 60); do
     echo "   bolt up after ${i}s"
     break
   fi
+  # Startup is the one window where a dead node has to be caught here: there is
+  # no health check yet, and without this the loop would spend 90s waiting for a
+  # port that nothing is listening on any more.
+  if ! kill -0 "$HYDRA_PID" 2>/dev/null; then
+    echo "!! graph-node exited during startup — its output is above" >&2
+    exit 1
+  fi
   sleep 1
-  if [[ "$i" == "60" ]]; then echo "!! bolt never came up" >&2; exit 1; fi
+  if [[ "$i" == "90" ]]; then echo "!! bolt never came up in 90s" >&2; exit 1; fi
 done
 
+# The id map goes with the store, always. It records which integer vertex id
+# each package key was given, and the loader preserves assignments it finds — so
+# a map left over from a previous run hands out ids for packages this fresh
+# store has never heard of, and the first scan writes edges to vertices that do
+# not exist. Wiping the store without wiping the map is the single most reliable
+# way to break this thing.
 echo "── loading the committed graph"
+rm -f data/idmap.json
 node src/load.js || { echo "!! load failed" >&2; exit 1; }
 
 echo "── serving on :${PORT:-8080}"
