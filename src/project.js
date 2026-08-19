@@ -223,7 +223,7 @@ export async function upsert(graph, {
   }
 
   if (persist) writeFileSync(`${DATA}idmap.json`, JSON.stringify(map));
-  return { newPackages: newNodes.length, edges: graph.edges.length, exposed, relType, map };
+  return { newPackages: nodesToUpsert.length, edges: graph.edges.length, exposed, relType, map };
 }
 
 // ------------------------------------------------------------------ report
