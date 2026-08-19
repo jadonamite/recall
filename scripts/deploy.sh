@@ -26,18 +26,37 @@ LINK="$ROOT/.vercel-project.json"
 
 export VERCEL_ORG_ID="$(node -p "require('$LINK').orgId")"
 export VERCEL_PROJECT_ID="$(node -p "require('$LINK').projectId")"
-TOKEN="$(node -p "require(require('os').homedir()+'/.local/share/com.vercel.cli/auth.json').token")"
 
 echo "── deploying $OUT to project $VERCEL_PROJECT_ID"
 URL="$(cd "$OUT" && vercel deploy --prod --yes 2>&1 | grep -oE 'https://[a-z0-9.-]+vercel\.app' | tail -1)"
 echo "   $URL"
 
 echo "── clearing deployment protection"
-curl -fsS -X PATCH \
-  "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID" \
+# The token is read HERE, after the deploy — not before it. `vercel deploy`
+# refreshes the CLI's OAuth token, so a copy taken earlier in the script is
+# already stale by this point and the PATCH comes back 403 with the clearing
+# silently skipped. That is how a login wall reaches a judge.
+API="https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID"
+TOKEN="$(node -p "require(require('os').homedir()+'/.local/share/com.vercel.cli/auth.json').token")"
+
+code="$(curl -s -o /tmp/vercel-protection.json -w '%{http_code}' -X PATCH "$API" \
   -H "Authorization: Bearer $TOKEN" \
   -H "content-type: application/json" \
-  -d '{"ssoProtection":null}' > /dev/null
+  -d '{"ssoProtection":null}')"
+
+if [[ "$code" != "200" ]]; then
+  echo "   ! PATCH returned $code — $(node -p "try{JSON.parse(require('fs').readFileSync('/tmp/vercel-protection.json','utf8')).error?.message ?? ''}catch(e){''}")" >&2
+fi
+
+# Verify from the API rather than assuming the write landed.
+curl -s -o /tmp/vercel-project.json "$API" -H "Authorization: Bearer $TOKEN" || true
+node -e '
+  let p = {};
+  try { p = JSON.parse(require("fs").readFileSync("/tmp/vercel-project.json", "utf8")); } catch {}
+  const sso = p.ssoProtection ?? null, pw = p.passwordProtection ?? null;
+  if (sso === null && pw === null) console.log("   protection: off");
+  else { console.error("   ! still protected:", JSON.stringify({ sso, pw }), "— judges will hit a login wall"); process.exit(1); }
+'
 
 sleep 3
 for path in / /app/ /site.json /demo.json; do
