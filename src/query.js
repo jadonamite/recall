@@ -139,9 +139,13 @@ export class Recall {
     await this.#retry(() => this.session.run(`MATCH ()-[r:${t}]->() DELETE r`));
   }
 
-  /** Reopen the session — a connection that hit a packing fault stays unhappy. */
+  /** Reopen the driver and session — a connection that hit a packing fault stays unhappy in the pool. */
   async reset() {
-    try { await this.session.close(); } catch { /* already gone */ }
+    try { await this.session?.close(); } catch { /* already gone */ }
+    try { await this.driver?.close(); } catch { /* already gone */ }
+    this.driver = neo4j.driver(BOLT, neo4j.auth.basic('token', TOKEN), {
+      disableLosslessIntegers: true,
+    });
     this.session = this.driver.session();
   }
 
