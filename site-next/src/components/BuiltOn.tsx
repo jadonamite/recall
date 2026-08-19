@@ -1,10 +1,16 @@
-import { Brand } from "./icons";
+import Image from "next/image";
 import { Reveal } from "./ui";
 
 /**
- * Who does the work. Real marks where an accurate one exists (simple-icons);
- * a wordmark where it does not, because a guessed glyph for someone else's
- * brand is worse than their name set properly.
+ * Who does the work. Each mark is the project's own published logo, taken from
+ * its own site — HydraDB's icon, OSV's wordmark, deps.dev's favicon, the
+ * Node.js light lockup, Vercel's and npm's marks from simple-icons — rather
+ * than a wordmark standing in for one.
+ *
+ * Where a project publishes both a light and a dark variant, the one that is
+ * legible on a near-black ground is the one used: OSV and Node.js both ship a
+ * version whose type is white, and picking the wrong file is how a credit list
+ * ends up with two invisible entries.
  *
  * Each entry says what it actually does here. "Powered by" strips that only
  * show logos are decoration; this one is a credit list.
@@ -14,9 +20,9 @@ type Collaborator = {
   name: string;
   role: string;
   href: string;
-  mark?: "github" | "npm" | "vercel" | "node";
-  /** Wordmark styling when there is no accurate logo to use. */
-  word?: string;
+  logo: string;
+  /** A wordmark is wider than it is tall and must not be boxed square. */
+  wide?: boolean;
 };
 
 const COLLABORATORS: Collaborator[] = [
@@ -24,37 +30,38 @@ const COLLABORATORS: Collaborator[] = [
     name: "HydraDB",
     role: "the graph store — every traversal on this page ran on it",
     href: "https://hydradb.com",
-    word: "Hydra",
+    logo: "/logos/hydradb.png",
   },
   {
     name: "OSV",
     role: "advisory windows, per package name",
     href: "https://osv.dev",
-    word: "OSV",
+    logo: "/logos/osv.png",
+    wide: true,
   },
   {
     name: "npm",
     role: "the registry, and the lock format Recall replays",
     href: "https://www.npmjs.com",
-    mark: "npm",
+    logo: "/logos/npm.png",
   },
   {
     name: "deps.dev",
     role: "resolved graphs when there is no lock file",
     href: "https://deps.dev",
-    word: "deps.dev",
+    logo: "/logos/depsdev.png",
   },
   {
     name: "Node.js",
     role: "the runtime, with no framework underneath the tool",
     href: "https://nodejs.org",
-    mark: "node",
+    logo: "/logos/nodejs.png",
   },
   {
     name: "Vercel",
     role: "hosts this page",
     href: "https://vercel.com",
-    mark: "vercel",
+    logo: "/logos/vercel.png",
   },
 ];
 
@@ -62,7 +69,7 @@ export default function BuiltOn() {
   return (
     <section className="pt-28 lg:pt-36">
       <Reveal>
-        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-fog">
+        <p className="font-mono text-[10px] tracking-[0.28em] text-fog uppercase">
           Who does the work
         </p>
       </Reveal>
@@ -77,14 +84,15 @@ export default function BuiltOn() {
                 rel="noreferrer"
                 className="group flex items-start gap-4"
               >
-                <span className="mt-0.5 grid h-11 w-11 flex-none place-items-center rounded-xl bg-white/[0.04] text-fog ring-1 ring-inset ring-white/[0.07] transition-colors group-hover:text-ice group-hover:ring-white/20">
-                  {c.mark ? (
-                    <Brand name={c.mark} title={c.name} className="h-5 w-5" />
-                  ) : (
-                    <span className="font-mono text-[11px] font-bold tracking-tight">
-                      {c.word}
-                    </span>
-                  )}
+                <span className="mt-0.5 grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-xl bg-white/[0.04] p-2 ring-1 ring-inset ring-white/[0.07] transition-colors group-hover:ring-white/20">
+                  <Image
+                    src={c.logo}
+                    alt=""
+                    width={c.wide ? 88 : 44}
+                    height={44}
+                    className="h-full w-full object-contain"
+                    unoptimized
+                  />
                 </span>
                 <span>
                   <span className="block text-sm font-semibold text-ice">

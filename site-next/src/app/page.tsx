@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Panel, Reveal, SectionLabel } from "@/components/ui";
+import { Reveal, SectionLabel } from "@/components/ui";
 import { Nav, Footer } from "@/components/Chrome";
 import RecallNotice from "@/components/RecallNotice";
 import Blocks from "@/components/Blocks";
@@ -9,7 +9,7 @@ import Collapse from "@/components/Collapse";
 import { StackPanel } from "@/components/Stack";
 import Deck from "@/components/Deck";
 import { Terminal, Prompt, Out } from "@/components/Terminal";
-import { IconArrow, IconShield, IconTerminal } from "@/components/icons";
+import { IconArrow, IconTerminal } from "@/components/icons";
 import { site, num } from "@/lib/data";
 
 /**
@@ -60,13 +60,13 @@ export default function Home() {
 
           <div className="flex flex-1 flex-col justify-center py-14">
             <Reveal>
-              <p className="font-mono text-[11px] tracking-[0.28em] text-act uppercase">
+              <p className="script text-[clamp(1.25rem,2.2vw,1.75rem)] text-act-soft">
                 The product-recall query for software
               </p>
             </Reveal>
 
             <Reveal delay={0.06}>
-              <h1 className="display display-xl mt-8 max-w-[17ch]">
+              <h1 className="display display-xl mt-7 max-w-[17ch]">
                 Your scanner names the part.
                 <span className="text-fog"> Nobody names the car.</span>
               </h1>
@@ -275,53 +275,6 @@ export default function Home() {
               </>
             ),
           },
-          {
-            index: "06",
-            id: "limits",
-            label: "Before you believe any of it",
-            children: (
-              <>
-                <h2 className="display display-lg max-w-[16ch]">
-                  The limits,
-                  <span className="text-fog"> stated first.</span>
-                </h2>
-                <div className="mt-7">
-                  <Panel className="p-6 lg:p-8">
-                    <IconShield className="h-5 w-5 text-act" />
-                    <ul className="mt-5 divide-y divide-white/[0.06]">
-                      {[
-                        [
-                          "It proves the part is in the car. Not that anyone turned it on.",
-                          "Recall shows a vulnerable version is in your tree and the chain that put it there. It does not claim the vulnerable function is ever called. Blurring the two is how this category lost its credibility.",
-                        ],
-                        [
-                          "The shared graph is a judgement call, not a mirror of npm.",
-                          `~${num(site.graph.seedPackages)} high-traffic seed packages with their resolved trees, plus ${site.graph.publicApps} public applications' lock files. Scanning your own project is unaffected, and your tree never joins this graph.`,
-                        ],
-                        [
-                          "Sometimes there is no upgrade to make.",
-                          "The real fix can be an overrides entry, and sometimes upstream has not shipped one at all. Recall tells you where the path enters; it does not promise the door opens.",
-                        ],
-                        [
-                          "CVSS v4 vectors are reported unrated.",
-                          "The v4 score is a lookup table, not a closed form. Running the v3 equation over a v4 vector produces a confident number that is simply wrong.",
-                        ],
-                      ].map(([head, body]) => (
-                        <li key={head} className="py-3 first:pt-0 last:pb-0">
-                          <span className="text-[14px] font-semibold text-ice">
-                            {head}
-                          </span>{" "}
-                          <span className="text-[14px] leading-relaxed text-fog">
-                            {body}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </Panel>
-                </div>
-              </>
-            ),
-          },
         ]}
       />
 
@@ -329,7 +282,7 @@ export default function Home() {
       <StackPanel track={1} last className="bg-[linear-gradient(168deg,rgba(255,171,61,0.09)_0%,rgba(12,14,18,0.96)_46%,rgba(8,10,13,0.99)_100%)]">
         <div className="text-center">
           <Reveal>
-            <h2 className="display display-lg mx-auto max-w-[18ch]">
+            <h2 className="display mx-auto max-w-[18ch] text-[clamp(2.2rem,5vw,4.1rem)] leading-[0.95] tracking-[-0.045em]">
               Software has a bill of materials.
               <span className="text-fog"> Now it has the query.</span>
             </h2>
@@ -361,6 +314,12 @@ export default function Home() {
               >
                 Read the source <IconArrow className="h-4 w-4 -rotate-45" />
               </a>
+              <Link
+                href="/limits"
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-fog transition-colors hover:text-ice"
+              >
+                What it does not claim
+              </Link>
             </div>
           </Reveal>
           <Reveal delay={0.2}>

@@ -40,10 +40,16 @@ export default function SmoothScroll() {
     // scroll position out from under it and the two disagree until the next
     // wheel event.
     const onClick = (e: MouseEvent) => {
-      const el = (e.target as HTMLElement | null)?.closest?.("a[href^='#']");
+      const el = (e.target as HTMLElement | null)?.closest?.(
+        "a[href^='#'], a[href^='/#']",
+      );
       const href = el?.getAttribute("href");
-      if (!href || href === "#") return;
-      const target = document.querySelector(href);
+      if (!href) return;
+      const hash = href.slice(href.indexOf("#"));
+      if (hash === "#") return;
+      // On another route the link is a real navigation, not a scroll.
+      if (href.startsWith("/#") && window.location.pathname !== "/") return;
+      const target = document.querySelector(hash);
       if (!target) return;
       e.preventDefault();
       lenis.scrollTo(target as HTMLElement, { offset: -24 });

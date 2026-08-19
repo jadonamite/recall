@@ -37,11 +37,14 @@ export function Nav() {
   return (
     <header className="relative z-20 flex items-center justify-between py-6">
       <RecallMark />
-      <nav className="flex items-center gap-1">
-        <NavIcon href="#notice" label="The recall query">
+      {/* On a phone the CTA is dropped and the destinations run to the trailing
+          edge: the hero repeats "Open the tool" one screen down, so a duplicate
+          up here costs the only row of width the nav has. */}
+      <nav className="flex flex-1 items-center justify-end gap-1">
+        <NavIcon href="/#notice" label="The recall query">
           <IconGraph />
         </NavIcon>
-        <NavIcon href="#collapse" label="Findings collapsed into upgrades">
+        <NavIcon href="/#collapse" label="Findings collapsed into upgrades">
           <IconLockfile />
         </NavIcon>
         <NavIcon
@@ -55,7 +58,7 @@ export function Nav() {
             a Next route, so the client router must not prefetch or soft-navigate. */}
         <a
           href="/app/"
-          className="ml-2 inline-flex items-center gap-2 rounded-full bg-act px-4 py-2.5 text-[13px] font-bold text-ice transition-colors hover:bg-act-soft hover:text-mid"
+          className="ml-2 hidden items-center gap-2 rounded-full bg-act px-4 py-2.5 text-[13px] font-bold text-ice transition-colors hover:bg-act-soft hover:text-mid sm:inline-flex"
         >
           <IconTerminal className="h-4 w-4" />
           Open the tool
@@ -70,11 +73,11 @@ export function Footer() {
     {
       head: "Recall",
       links: [
-        { label: "The recall query", href: "#notice" },
-        { label: "Findings → upgrades", href: "#collapse" },
-        { label: "How it holds up", href: "#how" },
-        { label: "Why a graph", href: "#graph" },
-        { label: "The limits", href: "#limits" },
+        { label: "The recall query", href: "/#notice" },
+        { label: "Findings → upgrades", href: "/#collapse" },
+        { label: "How it holds up", href: "/#how" },
+        { label: "Why a graph", href: "/#graph" },
+        { label: "What it does not claim", href: "/limits" },
       ],
     },
     {
@@ -160,7 +163,7 @@ export function Footer() {
       </div>
 
       <div className="mt-14 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.05] pt-6 font-mono text-[11px] text-fog">
-        <span>MIT · built for HackHydra Track 2</span>
+        <span>MIT · © 2026</span>
         <span>
           graph read {site.builtAt} · {num(site.graph.edges)} edges ·{" "}
           {site.graph.publicApps} public applications
