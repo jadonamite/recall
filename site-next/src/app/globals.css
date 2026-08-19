@@ -110,13 +110,13 @@ body::before {
 }
 
 .display-xl {
-  font-size: clamp(2.9rem, 9.4vw, 7.75rem);
+  font-size: clamp(2.4rem, 5.6vw, 4.5rem);
 }
 
 .display-lg {
-  font-size: clamp(2.5rem, 7.5vw, 6rem);
-  line-height: 0.92;
-  letter-spacing: -0.045em;
+  font-size: clamp(1.9rem, 3.6vw, 3.1rem);
+  line-height: 1.0;
+  letter-spacing: -0.038em;
 }
 
 .display-sm {

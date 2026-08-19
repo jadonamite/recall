@@ -64,7 +64,20 @@ function Stat({
   );
 }
 
-export default function RecallNotice({ notices }: { notices: Notice[] }) {
+/**
+ * `compact` is for the horizontal deck, where the whole card has one screen to
+ * live in. It drops the hop-distance histogram and the full notify list — both
+ * are elaboration on a number that is already stated above them — and keeps the
+ * subject, the reach, the ranked upgrades and the sample chains, which are the
+ * claim itself.
+ */
+export default function RecallNotice({
+  notices,
+  compact = false,
+}: {
+  notices: Notice[];
+  compact?: boolean;
+}) {
   const [i, setI] = useState(0);
   const [open, setOpen] = useState(false);
   const n = notices[i];
@@ -96,7 +109,12 @@ export default function RecallNotice({ notices }: { notices: Notice[] }) {
 
       <div className="grid lg:grid-cols-[1.05fr_1fr]">
         {/* left: the subject and its reach */}
-        <div className="border-b border-white/[0.07] p-7 lg:border-r lg:border-b-0 lg:p-9">
+        <div
+          className={cn(
+            "border-b border-white/[0.07] lg:border-r lg:border-b-0",
+            compact ? "p-6" : "p-7 lg:p-9",
+          )}
+        >
           <div className="font-mono text-[15px] break-all text-ice">{n.package}</div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Sev label={n.worst.label} score={n.worst.score} />
@@ -112,7 +130,23 @@ export default function RecallNotice({ notices }: { notices: Notice[] }) {
             <Stat n={num(n.cuts.length)} k="upgrades that close them" tone="fix" />
           </div>
 
-          <div className="mt-9">
+          {/* In the deck the chains live under the reach they explain, so the
+              two columns end at roughly the same height and the panel fits one
+              screen. In the full layout they stay beside the upgrades. */}
+          {compact && (
+            <>
+              <div className="mt-7 font-mono text-[10px] uppercase tracking-[0.16em] text-fog">
+                Sample chains, app first
+              </div>
+              <div className="mt-4 space-y-1.5">
+                {n.chains.slice(0, 2).map((c, idx) => (
+                  <Chain key={idx} path={c} />
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className={compact ? "hidden" : "mt-9"}>
             <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-fog">
               Chains by hop distance
             </div>
@@ -132,7 +166,7 @@ export default function RecallNotice({ notices }: { notices: Notice[] }) {
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className={compact ? "hidden" : "mt-8"}>
             <button
               onClick={() => setOpen((v) => !v)}
               className="font-mono text-[10px] uppercase tracking-[0.16em] text-fog transition-colors hover:text-ice"
@@ -155,12 +189,12 @@ export default function RecallNotice({ notices }: { notices: Notice[] }) {
         </div>
 
         {/* right: what to do, and the proof */}
-        <div className="p-7 lg:p-9">
+        <div className={compact ? "p-6" : "p-7 lg:p-9"}>
           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-fog">
             Upgrade these, in this order
           </div>
           <div className="mt-4">
-            {n.cuts.slice(0, 6).map((c) => (
+            {n.cuts.slice(0, compact ? 5 : 6).map((c) => (
               <div
                 key={c.package}
                 className="flex items-baseline gap-3 border-t border-white/[0.05] py-2.5 first:border-t-0"
@@ -174,21 +208,25 @@ export default function RecallNotice({ notices }: { notices: Notice[] }) {
                 </span>
               </div>
             ))}
-            {n.cuts.length > 6 && (
+            {n.cuts.length > (compact ? 5 : 6) && (
               <div className="pt-2 font-mono text-[11px] text-fog">
-                + {n.cuts.length - 6} more
+                + {n.cuts.length - (compact ? 5 : 6)} more
               </div>
             )}
           </div>
 
-          <div className="mt-8 font-mono text-[10px] uppercase tracking-[0.16em] text-fog">
-            Sample chains, app first
-          </div>
-          <div className="mt-4 space-y-1.5">
-            {n.chains.slice(0, 5).map((c, idx) => (
-              <Chain key={idx} path={c} />
-            ))}
-          </div>
+          {!compact && (
+            <>
+              <div className="mt-8 font-mono text-[10px] uppercase tracking-[0.16em] text-fog">
+                Sample chains, app first
+              </div>
+              <div className="mt-4 space-y-1.5">
+                {n.chains.slice(0, 5).map((c, idx) => (
+                  <Chain key={idx} path={c} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </Panel>

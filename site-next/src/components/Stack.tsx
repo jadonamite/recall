@@ -45,9 +45,14 @@ export function StackPanel({
     offset: ["start start", "end start"],
   });
 
-  const scale = useTransform(scrollYProgress, [0, 1], [1, last ? 1 : 0.93]);
-  const opacity = useTransform(scrollYProgress, [0, 1], [1, last ? 1 : 0.35]);
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", last ? "0%" : "-4%"]);
+  // Hold still for the first third of the track, then recede. Nothing on
+  // this page used to rest, which is what made the seams read as overlap
+  // rather than as one panel covering another.
+  const scale = useTransform(scrollYProgress, [0.34, 1], [1, last ? 1 : 0.93]);
+  // Gone, not merely dimmed, well before the incoming panel finishes
+  // arriving — two legible headings on screen at once is the bug.
+  const opacity = useTransform(scrollYProgress, [0.34, 0.78], [1, last ? 1 : 0]);
+  const y = useTransform(scrollYProgress, [0.34, 1], ["0%", last ? "0%" : "-4%"]);
 
   return (
     <section
@@ -62,7 +67,7 @@ export function StackPanel({
           className={cn(
             "grain relative w-full origin-top overflow-hidden",
             "rounded-t-[2rem] lg:rounded-t-[2.5rem]",
-            "bg-[linear-gradient(168deg,rgba(255,255,255,0.055)_0%,rgba(15,18,22,0.92)_42%,rgba(8,10,13,0.98)_100%)]",
+            "bg-[linear-gradient(168deg,#171b21_0%,#0e1116_42%,#08090b_100%)]",
             "px-6 py-16 ring-1 ring-inset ring-white/[0.08] sm:px-10 lg:px-16 lg:py-24",
             "shadow-[0_-30px_90px_-40px_rgba(0,0,0,0.9)]",
             className,

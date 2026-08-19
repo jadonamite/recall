@@ -214,31 +214,52 @@ const BLOCKS: Block[] = [
   },
 ];
 
-export default function Blocks() {
+export default function Blocks({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-5">
+    <div className={compact ? "grid gap-3 lg:grid-cols-2" : "grid gap-4 lg:grid-cols-5"}>
       {BLOCKS.map((b, i) => (
         <Reveal
           key={i}
           delay={i * 0.06}
-          className={b.wide ? "lg:col-span-3" : "lg:col-span-2"}
+          className={
+            compact ? "" : b.wide ? "lg:col-span-3" : "lg:col-span-2"
+          }
         >
           <Panel
             interactive
-            className="flex h-full min-h-[420px] flex-col overflow-hidden p-8 lg:p-10"
+            className={
+              compact
+                ? "flex h-full flex-col overflow-hidden p-6"
+                : "flex h-full min-h-[420px] flex-col overflow-hidden p-8 lg:p-10"
+            }
           >
-            <h3 className="max-w-[24ch] text-2xl font-bold leading-tight tracking-tight text-ice">
+            <h3
+              className={
+                compact
+                  ? "max-w-[26ch] text-lg font-bold leading-tight tracking-tight text-ice"
+                  : "max-w-[24ch] text-2xl font-bold leading-tight tracking-tight text-ice"
+              }
+            >
               {b.title}
             </h3>
-            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ice/70">
+            <p
+              className={
+                compact
+                  ? "mt-2 max-w-md text-[13.5px] leading-relaxed text-ice/70"
+                  : "mt-3 max-w-md text-[15px] leading-relaxed text-ice/70"
+              }
+            >
               {b.body}
             </p>
-            <ul className="mt-6 space-y-2.5">
+            <ul className={compact ? "mt-4 space-y-2" : "mt-6 space-y-2.5"}>
               {b.ticks.map((t) => (
                 <Ticked key={t}>{t}</Ticked>
               ))}
             </ul>
-            <Field>{b.visual}</Field>
+            {/* The isometric visual is the first thing to go when four cards
+                have to share one screen — it is atmosphere, and the ticks
+                above it are the evidence. */}
+            {!compact && <Field>{b.visual}</Field>}
           </Panel>
         </Reveal>
       ))}

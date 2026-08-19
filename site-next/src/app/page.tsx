@@ -7,6 +7,7 @@ import BuiltOn from "@/components/BuiltOn";
 import Marquee from "@/components/Marquee";
 import Collapse from "@/components/Collapse";
 import { StackPanel } from "@/components/Stack";
+import Deck from "@/components/Deck";
 import { Terminal, Prompt, Out } from "@/components/Terminal";
 import { IconArrow, IconShield, IconTerminal } from "@/components/icons";
 import { site, num } from "@/lib/data";
@@ -65,10 +66,8 @@ export default function Home() {
             </Reveal>
 
             <Reveal delay={0.06}>
-              <h1 className="display display-xl mt-8 max-w-[15ch]">
-                Your scanner
-                <br />
-                names the part.
+              <h1 className="display display-xl mt-8 max-w-[17ch]">
+                Your scanner names the part.
                 <span className="text-fog"> Nobody names the car.</span>
               </h1>
             </Reveal>
@@ -183,156 +182,148 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── 03 · the maintainer's direction ────────────────────────────── */}
-      <StackPanel id="notice" track={1.2}>
-        <Reveal>
-          <SectionLabel index="03">The query no scanner can answer</SectionLabel>
-        </Reveal>
-        <Reveal delay={0.06}>
-          <h2 className="display display-lg mt-8 max-w-[18ch]">
-            Your package was just compromised.
-            <span className="text-fog"> Who do you write to?</span>
-          </h2>
-        </Reveal>
-        <Reveal delay={0.12}>
-          <p className="lede mt-8 max-w-2xl text-ice/70">
-            A scanner starts from your project, so it can only ever answer{" "}
-            <em>am I affected</em>. Turn it around and you get the question a
-            factory asks the morning a part fails:{" "}
-            <span className="text-ice">
-              who shipped my part, through what, and how far did it get.
-            </span>
-          </p>
-        </Reveal>
-        <Reveal delay={0.16}>
-          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-fog">
-            Every figure below is measured, not illustrative — ~
-            {num(site.graph.seedPackages)} seed packages plus the committed lock
-            files of <Sources />. Traversal time on the live graph:{" "}
-            {site.graph.traversalSeconds}s.
-          </p>
-        </Reveal>
-        <Reveal delay={0.2} className="mt-10">
-          <RecallNotice notices={site.notices} />
-        </Reveal>
-      </StackPanel>
-
-      {/* ── 04 · how it holds up ───────────────────────────────────────── */}
-      <StackPanel id="how" track={1.2}>
-        <Reveal>
-          <SectionLabel index="04">How it holds up</SectionLabel>
-        </Reveal>
-        <Reveal delay={0.06}>
-          <h2 className="display display-lg mt-8 max-w-[16ch]">
-            Four things a flat scan
-            <span className="text-fog"> cannot do.</span>
-          </h2>
-        </Reveal>
-        <Reveal delay={0.12} className="mt-12">
-          <Blocks />
-        </Reveal>
-      </StackPanel>
-
-      {/* ── 05 · why a graph ───────────────────────────────────────────── */}
-      <StackPanel id="graph" track={1.25}>
-        <Reveal>
-          <SectionLabel index="05">Why this is not a table</SectionLabel>
-        </Reveal>
-        <Reveal delay={0.06}>
-          <h2 className="display display-lg mt-8 max-w-[14ch]">
-            &ldquo;Reaches&rdquo;
-            <span className="text-fog"> is not a distance.</span>
-          </h2>
-        </Reveal>
-        <Reveal delay={0.12}>
-          <p className="lede mt-8 max-w-2xl text-ice/70">
-            You can&rsquo;t answer this by finding things that look similar. The
-            broken package isn&rsquo;t <em>like</em> your app —{" "}
-            <span className="text-ice">it is inside it</span>, four handshakes
-            down. The only useful question is who is holding whose hand, and
-            that is a graph.
-          </p>
-        </Reveal>
-        <Reveal delay={0.16}>
-          <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-fog">
-            A relational schema answers these with recursive CTEs that fall over
-            at depth; a vector store cannot express them at all, because
-            similarity is not reachability.
-          </p>
-        </Reveal>
-        <Reveal delay={0.2} className="mt-10">
-          <Terminal title="the traversal, verbatim — HydraDB over Bolt">
-            <pre className="overflow-x-auto font-mono text-[12.5px] leading-relaxed text-fog">
-              {site.query.split("relDirection: 'incoming'").map((part, i, arr) => (
-                <span key={i}>
-                  {part}
-                  {i < arr.length - 1 && (
-                    <span className="font-bold text-act-soft">
-                      relDirection: &apos;incoming&apos;
-                    </span>
-                  )}
-                </span>
-              ))}
-            </pre>
-          </Terminal>
-        </Reveal>
-        <Reveal delay={0.24}>
-          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-fog">
-            One word does it. <span className="text-ice">incoming</span> walks
-            the dependency links backwards — up from the broken package to
-            everything shipping it. HydraDB rejects reverse variable-length
-            patterns, so it runs as a native procedure; that parameter is the
-            entire difference between a scanner and a recall.
-          </p>
-        </Reveal>
-      </StackPanel>
-
-      {/* ── 06 · the limits ────────────────────────────────────────────── */}
-      <StackPanel id="limits" track={1.2}>
-        <Reveal>
-          <SectionLabel index="06">Before you believe any of it</SectionLabel>
-        </Reveal>
-        <Reveal delay={0.06}>
-          <h2 className="display display-lg mt-8 max-w-[14ch]">
-            The limits,
-            <span className="text-fog"> stated first.</span>
-          </h2>
-        </Reveal>
-        <Reveal delay={0.12} className="mt-10">
-          <Panel className="p-7 lg:p-10">
-            <IconShield className="h-6 w-6 text-act" />
-            <ul className="mt-6 divide-y divide-white/[0.06]">
-              {[
-                [
-                  "It proves the part is in the car. Not that anyone turned it on.",
-                  "Recall shows a vulnerable version is in your tree and the chain that put it there. It does not claim the vulnerable function is ever called. That is a much harder problem, and blurring the two is how this category lost its credibility.",
-                ],
-                [
-                  "The shared graph is a judgement call, not a mirror of npm.",
-                  `It is ~${num(site.graph.seedPackages)} high-traffic seed packages with their resolved trees, plus ${site.graph.publicApps} public applications' lock files. Scanning your own project is unaffected, and your tree never joins this graph.`,
-                ],
-                [
-                  "Sometimes there is no upgrade to make.",
-                  "The real fix can be an overrides entry, and sometimes upstream has not shipped one at all. Recall tells you where the path enters; it does not promise the door opens.",
-                ],
-                [
-                  "CVSS v4 vectors are reported unrated.",
-                  "The v4 score is a lookup table, not a closed form. Running the v3 equation over a v4 vector produces a confident number that is simply wrong.",
-                ],
-              ].map(([head, body]) => (
-                <li key={head} className="py-4 first:pt-0 last:pb-0">
-                  <span className="text-[15px] font-semibold text-ice">
-                    {head}
+      {/* ── 03–06 · the horizontal deck ────────────────────────────────
+          Four peer cards, each one screen. On a phone the same four render as
+          ordinary stacked sections — see Deck. */}
+      <Deck
+        cards={[
+          {
+            index: "03",
+            id: "notice",
+            label: "The query no scanner can answer",
+            children: (
+              <>
+                <h2 className="display display-lg max-w-[24ch]">
+                  Your package was compromised.
+                  <span className="text-fog"> Who do you write to?</span>
+                </h2>
+                <p className="mt-4 max-w-3xl text-[16px] leading-relaxed text-ice/70">
+                  A scanner starts from your project, so it only ever answers{" "}
+                  <em>am I affected</em>. Turn it around and you get the question
+                  a factory asks the morning a part fails:{" "}
+                  <span className="text-ice">
+                    who shipped my part, through what, and how far did it get.
                   </span>{" "}
-                  <span className="text-[15px] leading-relaxed text-fog">
-                    {body}
+                  <span className="text-fog">
+                    Measured, not illustrative — ~{num(site.graph.seedPackages)}{" "}
+                    seed packages plus the lock files of <Sources />.
                   </span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        </Reveal>
-      </StackPanel>
+                </p>
+                <div className="mt-6">
+                  <RecallNotice notices={site.notices} compact />
+                </div>
+              </>
+            ),
+          },
+          {
+            index: "04",
+            id: "how",
+            label: "How it holds up",
+            children: (
+              <>
+                <h2 className="display display-lg max-w-[18ch]">
+                  Four things a flat scan
+                  <span className="text-fog"> cannot do.</span>
+                </h2>
+                <div className="mt-7">
+                  <Blocks compact />
+                </div>
+              </>
+            ),
+          },
+          {
+            index: "05",
+            id: "graph",
+            label: "Why this is not a table",
+            children: (
+              <>
+                <h2 className="display display-lg max-w-[16ch]">
+                  &ldquo;Reaches&rdquo;
+                  <span className="text-fog"> is not a distance.</span>
+                </h2>
+                <p className="lede mt-6 max-w-2xl text-ice/70">
+                  You can&rsquo;t answer this by finding things that look
+                  similar. The broken package isn&rsquo;t <em>like</em> your app
+                  — <span className="text-ice">it is inside it</span>, four
+                  handshakes down. The only useful question is who is holding
+                  whose hand, and that is a graph.
+                </p>
+                <div className="mt-7">
+                  <Terminal title="the traversal, verbatim — HydraDB over Bolt">
+                    <pre className="overflow-x-auto font-mono text-[12.5px] leading-relaxed text-fog">
+                      {site.query
+                        .split("relDirection: 'incoming'")
+                        .map((part, i, arr) => (
+                          <span key={i}>
+                            {part}
+                            {i < arr.length - 1 && (
+                              <span className="font-bold text-act-soft">
+                                relDirection: &apos;incoming&apos;
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                    </pre>
+                  </Terminal>
+                </div>
+                <p className="mt-5 max-w-2xl text-sm leading-relaxed text-fog">
+                  One word does it. <span className="text-ice">incoming</span>{" "}
+                  walks the dependency links backwards — up from the broken
+                  package to everything shipping it. That parameter is the entire
+                  difference between a scanner and a recall.
+                </p>
+              </>
+            ),
+          },
+          {
+            index: "06",
+            id: "limits",
+            label: "Before you believe any of it",
+            children: (
+              <>
+                <h2 className="display display-lg max-w-[16ch]">
+                  The limits,
+                  <span className="text-fog"> stated first.</span>
+                </h2>
+                <div className="mt-7">
+                  <Panel className="p-6 lg:p-8">
+                    <IconShield className="h-5 w-5 text-act" />
+                    <ul className="mt-5 divide-y divide-white/[0.06]">
+                      {[
+                        [
+                          "It proves the part is in the car. Not that anyone turned it on.",
+                          "Recall shows a vulnerable version is in your tree and the chain that put it there. It does not claim the vulnerable function is ever called. Blurring the two is how this category lost its credibility.",
+                        ],
+                        [
+                          "The shared graph is a judgement call, not a mirror of npm.",
+                          `~${num(site.graph.seedPackages)} high-traffic seed packages with their resolved trees, plus ${site.graph.publicApps} public applications' lock files. Scanning your own project is unaffected, and your tree never joins this graph.`,
+                        ],
+                        [
+                          "Sometimes there is no upgrade to make.",
+                          "The real fix can be an overrides entry, and sometimes upstream has not shipped one at all. Recall tells you where the path enters; it does not promise the door opens.",
+                        ],
+                        [
+                          "CVSS v4 vectors are reported unrated.",
+                          "The v4 score is a lookup table, not a closed form. Running the v3 equation over a v4 vector produces a confident number that is simply wrong.",
+                        ],
+                      ].map(([head, body]) => (
+                        <li key={head} className="py-3 first:pt-0 last:pb-0">
+                          <span className="text-[14px] font-semibold text-ice">
+                            {head}
+                          </span>{" "}
+                          <span className="text-[14px] leading-relaxed text-fog">
+                            {body}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+                </div>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {/* ── close ──────────────────────────────────────────────────────── */}
       <StackPanel track={1} last className="bg-[linear-gradient(168deg,rgba(255,171,61,0.09)_0%,rgba(12,14,18,0.96)_46%,rgba(8,10,13,0.99)_100%)]">
