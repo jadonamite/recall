@@ -43,6 +43,11 @@ const DATA = new URL('../data/', import.meta.url).pathname;
 // business accepting 32MB of anything from a stranger.
 const MAX_BODY = HOSTED ? 2 * 1024 * 1024 : 32 * 1024 * 1024;
 const MAX_PACKAGES = HOSTED ? 5_000 : Infinity;
+// A shared node runs in 512MB alongside the graph database. The report is what
+// grows: every finding keeps its paths, and a wide tree with a hundred findings
+// holds thousands of string arrays at once. Locally that is free; here it is the
+// difference between answering and being OOM-killed mid-scan.
+const REPORT_OPTS = HOSTED ? { limit: 1_200, keepPaths: 12 } : {};
 const MAX_NEW_NAMES = HOSTED ? 800 : Infinity;
 const SCAN_TIMEOUT_MS = HOSTED ? 3 * 60_000 : Infinity;
 
@@ -175,7 +180,9 @@ async function scan(req, res) {
     send({ stage: 'loaded', newPackages: up.newPackages, hits: up.exposed.length, relType });
 
     send({ stage: 'recall', message: 'traversing DEPENDS_ON backwards from each vulnerable version' });
-    const out = await report(graph, up.exposed, { relType, map: HOSTED ? hostedMap : undefined });
+    const out = await report(graph, up.exposed, {
+      relType, map: HOSTED ? hostedMap : undefined, ...REPORT_OPTS,
+    });
     send({ stage: 'done', report: out });
   } catch (e) {
     send({ stage: 'error', message: e.message ?? String(e) });
