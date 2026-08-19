@@ -1,0 +1,24 @@
+# Render blueprint for the shared Recall node.
+#
+#   https://render.com/docs/blueprint-spec
+#
+# One free web service running the Dockerfile: HydraDB on loopback inside the
+# container, the scan API on $PORT. Free instances sleep after 15 minutes and
+# take 30-60s to wake, which is why /app keeps rendering its recorded scan
+# instantly and treats a live scan as something you ask for.
+services:
+  - type: web
+    name: recall-node
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # The origins allowed to call /api/scan. The tool page is served from
+      # Vercel, so the browser sends a cross-origin request.
+      - key: RECALL_ORIGIN
+        value: https://recall-brown.vercel.app
+      - key: RECALL_HOSTED
+        value: "1"

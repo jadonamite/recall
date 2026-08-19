@@ -320,6 +320,14 @@
   .err.on { display: block; }
   .err code { color: #ffd7d3; }
 
+  /* what a visitor is actually talking to, on the deployed page */
+  .hosted-note {
+    display: none; margin: 14px 2px 0; max-width: 78ch;
+    font-size: 12.5px; line-height: 1.6; color: var(--ink-faint);
+  }
+  .hosted-note.on { display: block; }
+  .hosted-note strong { color: var(--ink-dim); font-weight: 600; }
+
   /* recorded-scan disclosure — only shown on the static deployment */
   .recorded { display: none; margin-top: 24px; gap: 14px; align-items: flex-start;
     padding: 15px 17px; border: 1px solid #453d22; border-radius: 11px;
@@ -555,6 +563,14 @@
     <label class="check"><input type="checkbox" id="dev" checked> include devDependencies</label>
   </div>
 
+  <p class="hosted-note" id="hosted-note">
+    This runs against a <strong>shared HydraDB node</strong>, not your machine. Your lock file is
+    resolved, traversed, and thrown away: the tree is written under a relationship type belonging
+    to this one scan and deleted when the answer is sent, so nothing you paste joins the public
+    graph or is visible to anyone else. The node sleeps when idle, so the first scan after a quiet
+    spell waits about a minute for it to wake, and it runs one scan at a time.
+  </p>
+
   <div class="progress" id="progress"><ul class="steps" id="steps"></ul></div>
   </div>
 </section>
@@ -701,6 +717,17 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 
+/**
+ * Where the scan runs.
+ *
+ * Empty when this page is served by the local tool (`npm run ui`) — the scan
+ * endpoint is the same origin. Set at build time on the deployed page, where it
+ * points at the shared node: a hosted HydraDB that takes a pasted lock file and
+ * nothing else, keeps no tree, and is asleep until somebody asks.
+ */
+const API = (window.RECALL_API ?? '').replace(/\/$/, '');
+let source = 'dir';
+
 // Scroll reveal, matching the landing's: nothing moves more than 16px, and it
 // is a no-op under prefers-reduced-motion because the class does the moving.
 (() => {
@@ -716,8 +743,33 @@ const el = (tag, cls, text) => {
   return n;
 };
 
+/**
+ * Turn the console into the shared node's console.
+ *
+ * The directory tab is removed rather than disabled — a hosted node refuses a
+ * path outright (it would be an arbitrary file read on somebody else's server),
+ * and offering an input that always fails is worse than not offering it.
+ */
+function hostedConsole() {
+  const dirTab = document.querySelector('.tab[data-field="f-dir"]');
+  if (dirTab) dirTab.remove();
+  $('f-dir')?.remove();
+  const lockTab = document.querySelector('.tab[data-field="f-lock"]');
+  if (lockTab) { lockTab.setAttribute('aria-selected', 'true'); lockTab.textContent = 'Scan your own lock file'; }
+  $('f-lock')?.classList.add('on');
+  source = 'lock';
+  $('run').textContent = 'Run a live recall';
+  // The local page's promise — "nothing leaves this machine" — is exactly the
+  // thing that stops being true here, so it cannot survive the switch.
+  const hint = $('f-lock')?.querySelector('.hint');
+  if (hint) hint.innerHTML = 'Lock file v2 or v3. It is sent to the shared node, resolved there, and not kept.';
+  const note = $('hosted-note');
+  if (note) note.classList.add('on');
+  document.querySelector('.term-title').textContent = 'recall — shared node';
+}
+
 // ------------------------------------------------------------------- tabs
-let source = 'dir';
+
 for (const tab of document.querySelectorAll('.tab')) {
   tab.addEventListener('click', () => {
     for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t === tab));
@@ -754,7 +806,11 @@ async function loadRecorded(src) {
   if (!r.ok) throw new Error(`could not load ${src}`);
   const report = await r.json();
 
-  document.querySelector('.console').classList.add('hide');
+  // With a shared node behind it the console stays: the recorded scan is what
+  // loads instantly, and a live scan is something the visitor asks for. Without
+  // one there is nothing the page could do with an input, so it goes away.
+  if (API) hostedConsole();
+  else document.querySelector('.console').classList.add('hide');
   $('how').classList.add('off');
 
   const banner = $('recorded');
@@ -797,7 +853,7 @@ async function run() {
       ? { dir: $('dir').value, dev: $('dev').checked }
       : { lock: $('lock').value, dev: $('dev').checked };
 
-    const res = await fetch('/api/scan', {
+    const res = await fetch(API + '/api/scan', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),

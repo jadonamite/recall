@@ -1,0 +1,13 @@
+# the unpacked hydradb image used for local dev — the container has its own
+.hydra-img/
+.hydradb/
+.fonts/
+.assets/
+node_modules/
+site-next/
+dist/
+docs/
+logs/
+test/
+.git/
+.vercel/

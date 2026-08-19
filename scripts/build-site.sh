@@ -41,9 +41,19 @@ OUT="site-next/out"
 
 echo "── folding in the tool at /app"
 mkdir -p "$OUT/app"
-# The tool reads its recorded scan from the site root.
-sed 's#</head>#<script>window.RECALL_DEMO = "../demo.json";</script>\n</head>#' \
-  public/index.html > "$OUT/app/index.html"
+# The tool reads its recorded scan from the site root, and — when a shared node
+# is configured — takes live scans from it. Without RECALL_API the page is
+# exactly what it is today: a recorded scan, with no input that could fail.
+INJECT='<script>window.RECALL_DEMO = "../demo.json";'
+if [[ -n "${RECALL_API:-}" ]]; then
+  echo "   live scans → $RECALL_API"
+  INJECT="$INJECT window.RECALL_API = \"$RECALL_API\";"
+else
+  echo "   no RECALL_API set — /app ships recorded-only"
+fi
+INJECT="$INJECT</script>"
+
+sed "s#</head>#${INJECT}\n</head>#" public/index.html > "$OUT/app/index.html"
 cp dist/demo.json "$OUT/demo.json"
 
 echo
