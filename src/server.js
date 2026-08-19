@@ -77,14 +77,17 @@ const hostedMap = HOSTED
 let busy = false;
 
 const ORIGINS = (process.env.RECALL_ORIGIN ?? 'https://recall-brown.vercel.app')
-  .split(',').map((o) => o.trim()).filter(Boolean);
+  .split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
 
 function cors(req, res) {
-  const origin = req.headers.origin;
   if (!HOSTED) return;
-  if (origin && (ORIGINS.includes(origin) || ORIGINS.includes('*'))) {
+  const origin = req.headers.origin;
+  const cleanOrigin = origin ? origin.replace(/\/$/, '') : null;
+  if (cleanOrigin && (ORIGINS.includes(cleanOrigin) || ORIGINS.includes('*') || ORIGINS.length === 0)) {
     res.setHeader('access-control-allow-origin', origin);
     res.setHeader('vary', 'origin');
+  } else if (ORIGINS.includes('*')) {
+    res.setHeader('access-control-allow-origin', '*');
   }
   res.setHeader('access-control-allow-methods', 'POST, GET, OPTIONS');
   res.setHeader('access-control-allow-headers', 'content-type');
@@ -218,7 +221,7 @@ const server = createServer(async (req, res) => {
   // Liveness that means something: the API is up AND it can reach the graph.
   // A health check that only proves the HTTP server started would let a node
   // with a dead HydraDB behind it stay in service.
-  if (req.method === 'GET' && req.url === '/healthz') {
+  if (req.method === 'GET' && (req.url === '/healthz' || req.url?.startsWith('/healthz'))) {
     cors(req, res);
     const r = new Recall({ map: hostedMap });
     try {
