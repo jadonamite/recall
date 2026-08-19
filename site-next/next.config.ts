@@ -5,6 +5,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "export",
   images: { unoptimized: true },
+  // The build is deployed as a bare directory of files, with no framework
+  // routing in front of it, so /limits only resolves if the export writes
+  // limits/index.html rather than limits.html. This is also how /app already
+  // works, so the two agree.
+  trailingSlash: true,
 };
 
 export default nextConfig;
