@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Geist_Mono, Dancing_Script } from "next/font/google";
+import { Bricolage_Grotesque, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import SmoothScroll from "@/components/SmoothScroll";
+import Rail from "@/components/Rail";
 
 // Three faces, the same set the rest of the house uses. Bricolage Grotesque
 // carries the voice — the same lockup Binary and Delta use, so they read as one
@@ -17,9 +19,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-/** Used sparingly, for human asides — never for data or navigation. */
-const dancingScript = Dancing_Script({
+/**
+ * Used sparingly, for asides — never for data or navigation. A serif set in
+ * italic beside a grotesk reads as an author's remark rather than as another
+ * label, and it keeps the page's voice without going decorative.
+ */
+const instrumentSerif = Instrument_Serif({
   variable: "--font-script-face",
+  weight: "400",
+  style: ["normal", "italic"],
   subsets: ["latin"],
 });
 
@@ -35,9 +43,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bricolage.variable} ${geistMono.variable} ${dancingScript.variable} h-full antialiased`}
+      className={`${bricolage.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <SmoothScroll />
+        <Rail />
+        {children}
+      </body>
     </html>
   );
 }

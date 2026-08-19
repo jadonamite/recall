@@ -2,17 +2,28 @@ import Link from "next/link";
 import { Panel, Reveal, SectionLabel } from "@/components/ui";
 import { Nav, Footer } from "@/components/Chrome";
 import RecallNotice from "@/components/RecallNotice";
-import WallOrRecall from "@/components/WallOrRecall";
 import Blocks from "@/components/Blocks";
 import BuiltOn from "@/components/BuiltOn";
-import HeroTerminal from "@/components/HeroTerminal";
+import Marquee from "@/components/Marquee";
+import Collapse from "@/components/Collapse";
+import { StackPanel } from "@/components/Stack";
 import { Terminal, Prompt, Out } from "@/components/Terminal";
 import { IconArrow, IconShield, IconTerminal } from "@/components/icons";
 import { site, num } from "@/lib/data";
 
-// Spacing is deliberately uneven. The thesis and the recall notice get the most
-// air because they carry the argument; the proof band is tight and dense so it
-// reads as instrumentation rather than as another content section.
+/**
+ * The page reads in two layers on purpose. The skim layer — display line, then
+ * one plain sentence — carries the whole argument for someone who never stops
+ * scrolling. The depth layer under it keeps the precise, technical statement
+ * for a reader who has decided to check. Neither is a summary of the other:
+ * removing the depth layer would make the page unfalsifiable, and removing the
+ * skim layer is what the previous version did, which meant the argument only
+ * landed for people who already knew the domain.
+ *
+ * Structurally each section is a panel that sticks and is covered by the next,
+ * so nothing scrolls away. The exception is the collapse, which owns four
+ * viewports of scroll and pins, because that transformation is the product.
+ */
 
 function Sources() {
   const s = site.publicSources;
@@ -39,152 +50,180 @@ export default function Home() {
   const c = site.consumer;
 
   return (
-    <main className="mx-auto w-full max-w-md px-6 sm:max-w-2xl lg:max-w-6xl lg:px-10">
-      <Nav />
+    <main>
+      {/* ── Hero ───────────────────────────────────────────────────────── */}
+      <section className="relative min-h-dvh overflow-hidden">
+        <Marquee />
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-6 lg:px-10">
+          <Nav />
 
-      {/* Hero */}
-      <section className="pt-16 pb-4 lg:pt-24">
-        <Reveal>
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-act">
-            The product-recall query for software
-          </p>
-        </Reveal>
-        <Reveal delay={0.06}>
-          <h1 className="mt-7 max-w-[19ch] text-5xl font-extrabold leading-[0.98] tracking-[-0.042em] lg:text-[5.2rem]">
-            Toyota has run this query
-            <span className="text-fog"> since the 1970s.</span>
-          </h1>
-        </Reveal>
-        <Reveal delay={0.12}>
-          <p className="mt-8 max-w-xl text-lg leading-relaxed text-ice/65">
-            When a bad component lot turns up, a manufacturer runs the bill of
-            materials <span className="text-ice">upward</span>
-            {" — "}which sub-assemblies used it, which finished products used
-            those, which owners to write to. Software borrowed the phrase &ldquo;bill of
-            materials&rdquo; and never implemented the query that makes one
-            useful.
-          </p>
-        </Reveal>
-        <Reveal delay={0.18} className="mt-9">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="#notice"
-              className="inline-flex items-center gap-2 rounded-full bg-act px-5 py-3 text-sm font-bold text-ice transition-colors hover:bg-act-soft hover:text-mid"
-            >
-              See the query <IconArrow className="h-4 w-4" />
-            </Link>
-            <a
-              href="/app/"
-              className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-ice ring-1 ring-inset ring-white/15 transition-colors hover:ring-white/30"
-            >
-              <IconTerminal className="h-4 w-4" /> Open the tool
-            </a>
+          <div className="flex flex-1 flex-col justify-center py-14">
+            <Reveal>
+              <p className="font-mono text-[11px] tracking-[0.28em] text-act uppercase">
+                The product-recall query for software
+              </p>
+            </Reveal>
+
+            <Reveal delay={0.06}>
+              <h1 className="display display-xl mt-8 max-w-[15ch]">
+                Your scanner
+                <br />
+                names the part.
+                <span className="text-fog"> Nobody names the car.</span>
+              </h1>
+            </Reveal>
+
+            <Reveal delay={0.12}>
+              <p className="lede mt-9 max-w-2xl text-ice/70">
+                When a car part turns out to be dangerous, the factory doesn&rsquo;t
+                publish the part number and wish you luck. It works out which
+                cars were built with it, and writes to the people driving them.
+                <span className="text-ice">
+                  {" "}
+                  Recall does that for your code.
+                </span>
+              </p>
+            </Reveal>
+
+            <Reveal delay={0.16}>
+              <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-fog">
+                Technically: a reverse traversal over the dependency graph.
+                Given a compromised package, it returns every dependent{" "}
+                <em>by path</em>, the size of the reachable subgraph, and the
+                upgrade that severs the most paths.
+              </p>
+            </Reveal>
+
+            <Reveal delay={0.22} className="mt-10">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href="#collapse"
+                  className="inline-flex items-center gap-2 rounded-full bg-act px-6 py-3.5 text-sm font-bold text-ice transition-colors hover:bg-act-soft hover:text-mid"
+                >
+                  Watch 135 problems become 40{" "}
+                  <IconArrow className="h-4 w-4" />
+                </Link>
+                <a
+                  href="/app/"
+                  className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-ice ring-1 ring-white/15 ring-inset transition-colors hover:ring-white/30"
+                >
+                  <IconTerminal className="h-4 w-4" /> Open the tool
+                </a>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.3}>
+              <dl className="mt-16 grid max-w-3xl grid-cols-2 gap-x-8 gap-y-6 border-t border-white/[0.08] pt-8 lg:grid-cols-4">
+                {[
+                  ["packages in the graph", num(site.graph.packages)],
+                  ["dependency links", num(site.graph.edges)],
+                  ["advisory windows", num(site.graph.advisoryWindows)],
+                  ["store", "HydraDB"],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="font-mono text-[10px] tracking-[0.16em] text-fog uppercase">
+                      {k}
+                    </dt>
+                    <dd className="tnum mt-2 font-mono text-xl font-bold">
+                      {v}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </Reveal>
           </div>
-        </Reveal>
-        {c && (
-          <Reveal delay={0.24} className="mt-14">
-            <HeroTerminal data={c} />
-          </Reveal>
-        )}
+        </div>
       </section>
 
-      {/* Proof band — tight, no card chrome */}
-      <Reveal delay={0.24}>
-        <section className="mt-16 grid grid-cols-2 border-y border-white/[0.07] lg:grid-cols-5">
-          {[
-            ["packages", num(site.graph.packages)],
-            ["dependency edges", num(site.graph.edges)],
-            ["advisory windows", num(site.graph.advisoryWindows)],
-            ["exposed with reach", num(site.graph.exposedWithReach)],
-            ["store", "HydraDB"],
-          ].map(([k, v], i) => (
-            <div
-              key={k}
-              className={
-                i === 0
-                  ? "py-5 pr-5"
-                  : "border-t border-white/[0.05] py-5 pr-5 lg:border-t-0 lg:border-l lg:border-white/[0.05] lg:pl-5"
-              }
-            >
-              <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-fog">
-                {k}
-              </dt>
-              <dd className="tnum mt-2 font-mono text-lg font-semibold">{v}</dd>
-            </div>
-          ))}
-        </section>
-      </Reveal>
-
-      {/* 01 — the trap */}
+      {/* ── 01 · the trap ──────────────────────────────────────────────── */}
       {c && (
-        <section id="collapse" className="pt-32 lg:pt-48">
+        <StackPanel id="wall" track={1.1}>
           <Reveal>
             <SectionLabel index="01">What every scanner does</SectionLabel>
           </Reveal>
           <Reveal delay={0.06}>
-            <h2 className="mt-7 max-w-3xl text-4xl font-extrabold leading-[1.03] tracking-[-0.035em] lg:text-[3.6rem]">
-              A list tells you that you&rsquo;re bleeding.
-              <span className="text-fog"> Not where the wound is.</span>
+            <h2 className="display display-lg mt-8 max-w-[16ch]">
+              {num(c.findings)} problems.
+              <span className="text-fog"> None of them yours.</span>
             </h2>
           </Reveal>
           <Reveal delay={0.12}>
-            <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-ice/65">
-              Run <code className="font-mono text-ice">npm audit</code> on
-              anything real and you get hundreds of findings, unordered, naming
-              packages you never installed on purpose. You cannot tell which
-              single upgrade kills thirty of them, because{" "}
-              <span className="text-ice">a list has already thrown away the path.</span>{" "}
-              So people stop reading it. That is alert fatigue, and it is the
-              defining failure of this whole category of tool.
+            <p className="lede mt-8 max-w-2xl text-ice/70">
+              This project installed {num(c.fixCount)} things on purpose. The
+              scanner found {num(c.findings)} problems — almost all of them in
+              packages nobody chose, sitting up to eight levels underneath the
+              ones that were.{" "}
+              <span className="text-ice">
+                It won&rsquo;t tell you which of your {num(c.fixCount)} they came
+                in through.
+              </span>
             </p>
           </Reveal>
-          <Reveal delay={0.16} className="mt-12">
-            <WallOrRecall data={c} />
+          <Reveal delay={0.16}>
+            <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-fog">
+              So you can&rsquo;t tell which single upgrade kills thirty findings
+              at once, because a flat list has already thrown away the path. That
+              is alert fatigue, and it is the defining failure of this whole
+              category of tool: people learn the output is mostly noise and stop
+              reading it.
+            </p>
           </Reveal>
-        </section>
+          <Reveal delay={0.2}>
+            <p className="mt-10 font-mono text-[11px] tracking-[0.16em] text-act uppercase">
+              ↓ keep scrolling — the list sorts itself out
+            </p>
+          </Reveal>
+        </StackPanel>
       )}
 
-      {/* 02 — the recall notice */}
-      <section id="notice" className="pt-32 lg:pt-48">
+      {/* ── 02 · the pinned collapse ───────────────────────────────────── */}
+      {c && (
+        <div id="collapse" className="relative bg-mid">
+          <Collapse data={c} />
+        </div>
+      )}
+
+      {/* ── 03 · the maintainer's direction ────────────────────────────── */}
+      <StackPanel id="notice" track={1.2}>
         <Reveal>
-          <SectionLabel index="02">The query no scanner can answer</SectionLabel>
+          <SectionLabel index="03">The query no scanner can answer</SectionLabel>
         </Reveal>
         <Reveal delay={0.06}>
-          <h2 className="mt-7 max-w-3xl text-4xl font-extrabold leading-[1.03] tracking-[-0.035em] lg:text-[3.6rem]">
+          <h2 className="display display-lg mt-8 max-w-[18ch]">
             Your package was just compromised.
-            <span className="text-fog"> Who do you have to write to?</span>
+            <span className="text-fog"> Who do you write to?</span>
           </h2>
         </Reveal>
         <Reveal delay={0.12}>
-          <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-ice/65">
-            A scanner starts from <em>your</em>{" "}manifest, so it can only answer
-            the consumer&rsquo;s question. The maintainer&rsquo;s question runs
-            the other way, and it is the one an actual product recall asks:{" "}
+          <p className="lede mt-8 max-w-2xl text-ice/70">
+            A scanner starts from your project, so it can only ever answer{" "}
+            <em>am I affected</em>. Turn it around and you get the question a
+            factory asks the morning a part fails:{" "}
             <span className="text-ice">
-              who shipped my part, by what chain, and which single upgrade closes
-              the most of it.
+              who shipped my part, through what, and how far did it get.
             </span>
           </p>
         </Reveal>
         <Reveal delay={0.16}>
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-fog">
-            Every figure below is measured, not illustrative. The dependents are
-            real published packages and real public applications: ~150 seed
-            packages plus the committed lock files of <Sources />.
+          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-fog">
+            Every figure below is measured, not illustrative — ~
+            {num(site.graph.seedPackages)} seed packages plus the committed lock
+            files of <Sources />. Traversal time on the live graph:{" "}
+            {site.graph.traversalSeconds}s.
           </p>
         </Reveal>
-        <Reveal delay={0.2} className="mt-12">
+        <Reveal delay={0.2} className="mt-10">
           <RecallNotice notices={site.notices} />
         </Reveal>
-      </section>
+      </StackPanel>
 
-      {/* 03 — how it works, as blocks */}
-      <section id="how" className="pt-32 lg:pt-48">
+      {/* ── 04 · how it holds up ───────────────────────────────────────── */}
+      <StackPanel id="how" track={1.2}>
         <Reveal>
-          <SectionLabel index="03">How it holds up</SectionLabel>
+          <SectionLabel index="04">How it holds up</SectionLabel>
         </Reveal>
         <Reveal delay={0.06}>
-          <h2 className="mt-7 max-w-2xl text-4xl font-extrabold leading-[1.03] tracking-[-0.035em] lg:text-[3.6rem]">
+          <h2 className="display display-lg mt-8 max-w-[16ch]">
             Four things a flat scan
             <span className="text-fog"> cannot do.</span>
           </h2>
@@ -192,30 +231,36 @@ export default function Home() {
         <Reveal delay={0.12} className="mt-12">
           <Blocks />
         </Reveal>
-      </section>
+      </StackPanel>
 
-      {/* 04 — why a graph */}
-      <section id="graph" className="pt-32 lg:pt-48">
+      {/* ── 05 · why a graph ───────────────────────────────────────────── */}
+      <StackPanel id="graph" track={1.25}>
         <Reveal>
-          <SectionLabel index="04">Why this is not a table</SectionLabel>
+          <SectionLabel index="05">Why this is not a table</SectionLabel>
         </Reveal>
         <Reveal delay={0.06}>
-          <h2 className="mt-7 max-w-2xl text-4xl font-extrabold leading-[1.03] tracking-[-0.035em] lg:text-[3.6rem]">
+          <h2 className="display display-lg mt-8 max-w-[14ch]">
             &ldquo;Reaches&rdquo;
             <span className="text-fog"> is not a distance.</span>
           </h2>
         </Reveal>
         <Reveal delay={0.12}>
-          <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-ice/65">
-            Every question above is a path query. A relational schema answers
-            them with recursive CTEs that fall over at depth; a vector store
-            cannot express them at all, because similarity is not reachability —{" "}
-            <span className="text-ice">
-              the compromised package is not <em>like</em> your app, it is inside it.
-            </span>
+          <p className="lede mt-8 max-w-2xl text-ice/70">
+            You can&rsquo;t answer this by finding things that look similar. The
+            broken package isn&rsquo;t <em>like</em> your app —{" "}
+            <span className="text-ice">it is inside it</span>, four handshakes
+            down. The only useful question is who is holding whose hand, and
+            that is a graph.
           </p>
         </Reveal>
-        <Reveal delay={0.16} className="mt-10">
+        <Reveal delay={0.16}>
+          <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-fog">
+            A relational schema answers these with recursive CTEs that fall over
+            at depth; a vector store cannot express them at all, because
+            similarity is not reachability.
+          </p>
+        </Reveal>
+        <Reveal delay={0.2} className="mt-10">
           <Terminal title="the traversal, verbatim — HydraDB over Bolt">
             <pre className="overflow-x-auto font-mono text-[12.5px] leading-relaxed text-fog">
               {site.query.split("relDirection: 'incoming'").map((part, i, arr) => (
@@ -231,22 +276,24 @@ export default function Home() {
             </pre>
           </Terminal>
         </Reveal>
-        <Reveal delay={0.2}>
-          <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-            HydraDB rejects reverse variable-length patterns, so the traversal
-            runs as a native procedure. That one parameter is the entire
-            difference between a scanner and a recall.
+        <Reveal delay={0.24}>
+          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-fog">
+            One word does it. <span className="text-ice">incoming</span> walks
+            the dependency links backwards — up from the broken package to
+            everything shipping it. HydraDB rejects reverse variable-length
+            patterns, so it runs as a native procedure; that parameter is the
+            entire difference between a scanner and a recall.
           </p>
         </Reveal>
-      </section>
+      </StackPanel>
 
-      {/* 05 — the limits */}
-      <section id="limits" className="pt-32 lg:pt-48">
+      {/* ── 06 · the limits ────────────────────────────────────────────── */}
+      <StackPanel id="limits" track={1.2}>
         <Reveal>
-          <SectionLabel index="05">Before you believe any of it</SectionLabel>
+          <SectionLabel index="06">Before you believe any of it</SectionLabel>
         </Reveal>
         <Reveal delay={0.06}>
-          <h2 className="mt-7 max-w-2xl text-4xl font-extrabold leading-[1.03] tracking-[-0.035em] lg:text-[3.6rem]">
+          <h2 className="display display-lg mt-8 max-w-[14ch]">
             The limits,
             <span className="text-fog"> stated first.</span>
           </h2>
@@ -257,16 +304,16 @@ export default function Home() {
             <ul className="mt-6 divide-y divide-white/[0.06]">
               {[
                 [
-                  "It does not claim reachability.",
-                  "Recall proves a vulnerable version is in your tree and shows the chain. It does not claim the vulnerable function is ever called. That is a much harder problem, and blurring the two is how this category lost its credibility.",
+                  "It proves the part is in the car. Not that anyone turned it on.",
+                  "Recall shows a vulnerable version is in your tree and the chain that put it there. It does not claim the vulnerable function is ever called. That is a much harder problem, and blurring the two is how this category lost its credibility.",
                 ],
                 [
                   "The shared graph is a judgement call, not a mirror of npm.",
-                  `It is ~150 high-traffic seed packages with their resolved trees, plus ${site.graph.publicApps} public applications' lock files. Scanning your own project is unaffected, and your tree never joins this graph.`,
+                  `It is ~${num(site.graph.seedPackages)} high-traffic seed packages with their resolved trees, plus ${site.graph.publicApps} public applications' lock files. Scanning your own project is unaffected, and your tree never joins this graph.`,
                 ],
                 [
-                  "An upgrade is not always available.",
-                  "Sometimes the real fix is an overrides entry, and sometimes upstream has not shipped one at all. Recall tells you where the path enters; it does not promise the door opens.",
+                  "Sometimes there is no upgrade to make.",
+                  "The real fix can be an overrides entry, and sometimes upstream has not shipped one at all. Recall tells you where the path enters; it does not promise the door opens.",
                 ],
                 [
                   "CVSS v4 vectors are reported unrated.",
@@ -274,59 +321,73 @@ export default function Home() {
                 ],
               ].map(([head, body]) => (
                 <li key={head} className="py-4 first:pt-0 last:pb-0">
-                  <span className="text-[15px] font-semibold text-ice">{head}</span>{" "}
-                  <span className="text-[15px] leading-relaxed text-fog">{body}</span>
+                  <span className="text-[15px] font-semibold text-ice">
+                    {head}
+                  </span>{" "}
+                  <span className="text-[15px] leading-relaxed text-fog">
+                    {body}
+                  </span>
                 </li>
               ))}
             </ul>
           </Panel>
         </Reveal>
-      </section>
+      </StackPanel>
 
-      <BuiltOn />
-
-      {/* Close */}
-      <Reveal className="mt-32 lg:mt-44">
-        <Panel glow className="px-8 py-16 text-center lg:px-16 lg:py-24">
-          <h2 className="mx-auto max-w-[24ch] text-4xl font-extrabold leading-[1.04] tracking-[-0.035em] lg:text-6xl">
-            Software has a bill of materials.
-            <span className="text-fog"> Now it has the query.</span>
-          </h2>
-          <p className="script mx-auto mt-6 text-2xl text-act-soft">
-            Nobody had to invent this — only implement it.
-          </p>
-          <p className="mx-auto mt-6 max-w-lg text-[15px] leading-relaxed text-ice/65">
-            Open source, MIT, and the crawled graph ships with the repo — so it
-            runs in one step instead of after an afternoon of crawling.
-          </p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <a
-              href="/app/"
-              className="inline-flex items-center gap-2 rounded-full bg-act px-6 py-3 text-sm font-bold text-ice transition-colors hover:bg-act-soft hover:text-mid"
-            >
-              <IconTerminal className="h-4 w-4" /> Open the tool
-            </a>
-            <a
-              href="https://github.com/jadonamite/recall"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-ice ring-1 ring-inset ring-white/15 transition-colors hover:ring-white/30"
-            >
-              Read the source <IconArrow className="h-4 w-4 -rotate-45" />
-            </a>
-          </div>
-          <div className="mx-auto mt-10 max-w-lg text-left">
-            <Terminal title="bash — one step, the graph ships with the repo">
-              <Prompt>git clone github.com/jadonamite/recall</Prompt>
-              <Prompt>npm install &amp;&amp; npm run load</Prompt>
-              <Prompt>npm run recall ~/code/your-app</Prompt>
-              <Out className="mt-2">→ your findings, collapsed onto their upgrades</Out>
-            </Terminal>
-          </div>
-        </Panel>
-      </Reveal>
-
-      <Footer />
+      {/* ── close ──────────────────────────────────────────────────────── */}
+      <StackPanel track={1} last className="bg-[linear-gradient(168deg,rgba(255,171,61,0.09)_0%,rgba(12,14,18,0.96)_46%,rgba(8,10,13,0.99)_100%)]">
+        <div className="text-center">
+          <Reveal>
+            <h2 className="display display-lg mx-auto max-w-[18ch]">
+              Software has a bill of materials.
+              <span className="text-fog"> Now it has the query.</span>
+            </h2>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <p className="script mx-auto mt-6 text-2xl text-act-soft">
+              Nobody had to invent this — only implement it.
+            </p>
+          </Reveal>
+          <Reveal delay={0.08}>
+            <p className="lede mx-auto mt-7 max-w-xl text-ice/70">
+              Open source, MIT, and the crawled graph ships with the repo — so it
+              runs in one step instead of after an afternoon of crawling.
+            </p>
+          </Reveal>
+          <Reveal delay={0.14}>
+            <div className="mt-10 flex flex-wrap justify-center gap-3">
+              <a
+                href="/app/"
+                className="inline-flex items-center gap-2 rounded-full bg-act px-6 py-3.5 text-sm font-bold text-ice transition-colors hover:bg-act-soft hover:text-mid"
+              >
+                <IconTerminal className="h-4 w-4" /> Open the tool
+              </a>
+              <a
+                href="https://github.com/jadonamite/recall"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-ice ring-1 ring-white/15 ring-inset transition-colors hover:ring-white/30"
+              >
+                Read the source <IconArrow className="h-4 w-4 -rotate-45" />
+              </a>
+            </div>
+          </Reveal>
+          <Reveal delay={0.2}>
+            <div className="mx-auto mt-12 max-w-lg text-left">
+              <Terminal title="bash — one step, the graph ships with the repo">
+                <Prompt>git clone github.com/jadonamite/recall</Prompt>
+                <Prompt>npm install &amp;&amp; npm run load</Prompt>
+                <Prompt>npm run recall ~/code/your-app</Prompt>
+                <Out className="mt-2">
+                  → your findings, collapsed onto their upgrades
+                </Out>
+              </Terminal>
+            </div>
+          </Reveal>
+          <BuiltOn />
+          <Footer />
+        </div>
+      </StackPanel>
     </main>
   );
 }

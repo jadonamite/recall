@@ -16,12 +16,12 @@
   --color-ice: #e8ecf1; /* primary text */
   --color-fog: #98a2b0; /* secondary text */
 
-  /* Bricolage for voice, Geist Mono for machine output, Dancing Script for
-     the occasional human aside. Bricolage's optical-size axis holds from 10px
-     labels to display; the mono keeps Cypher and transcripts honest. */
+  /* Bricolage for voice, Geist Mono for machine output, Instrument Serif for
+     the occasional aside. Bricolage's optical-size axis holds from 10px labels
+     to display; the mono keeps Cypher and transcripts honest. */
   --font-sans: var(--font-bricolage), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  --font-script: var(--font-script-face), "Segoe Script", cursive;
+  --font-script: var(--font-script-face), ui-serif, Georgia, serif;
 }
 
 html {
@@ -75,10 +75,12 @@ body::before {
   background-size: 44px 26px;
 }
 
-/* The script face, used sparingly for human asides. */
+/* The aside face, used sparingly. Italic, because beside a grotesk that is
+   what makes it read as a remark rather than as another heading. */
 .script {
-  font-family: var(--font-script), cursive;
-  font-weight: 500;
+  font-family: var(--font-script), serif;
+  font-style: italic;
+  font-weight: 400;
   letter-spacing: 0.005em;
   line-height: 1.25;
 }
@@ -89,5 +91,70 @@ body::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+/* ── Display type ───────────────────────────────────────────────────────────
+   Bricolage Grotesque is a variable face and the page was using one weight of
+   it. The headline slots below drive weight, optical size and tracking
+   together, which is what makes large type read as set rather than as body
+   copy scaled up: tracking tightens as size grows, and the optical-size axis
+   opens the counters back up so it stays legible while doing it. */
+
+.display {
+  font-weight: 800;
+  font-variation-settings: "opsz" 48;
+  letter-spacing: -0.055em;
+  line-height: 0.86;
+  text-wrap: balance;
+}
+
+.display-xl {
+  font-size: clamp(2.9rem, 9.4vw, 7.75rem);
+}
+
+.display-lg {
+  font-size: clamp(2.5rem, 7.5vw, 6rem);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+}
+
+.display-sm {
+  font-size: clamp(1.75rem, 3.6vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+  font-variation-settings: "opsz" 32;
+}
+
+/* The lead paragraph under a display line. Larger and lighter than body copy,
+   because it is doing the work of a subheading. */
+.lede {
+  font-size: clamp(1.0625rem, 1.6vw, 1.375rem);
+  line-height: 1.55;
+  letter-spacing: -0.011em;
+  text-wrap: pretty;
+}
+
+/* ── Vertical marquee ──────────────────────────────────────────────────────
+   Two identical copies stacked, translated by exactly half the container, so
+   the loop closes on itself with no visible seam. */
+
+@keyframes marquee-up {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+
+@keyframes marquee-down {
+  from { transform: translateY(-50%); }
+  to   { transform: translateY(0); }
+}
+
+.marquee-up   { animation: marquee-up linear infinite; will-change: transform; }
+.marquee-down { animation: marquee-down linear infinite; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-up,
+  .marquee-down { animation: none; }
   html { scroll-behavior: auto; }
 }

@@ -354,7 +354,7 @@ written for this project. What it stands on:
 
 - **Bricolage Grotesque** — the voice: headings, labels, figures.
 - **Geist Mono** — code and machine output: Cypher, transcripts, versions.
-- **Dancing Script** — human asides, used sparingly and never for data.
+- **Instrument Serif** — asides, set in italic, used sparingly and never for data.
 
 ## License
 
