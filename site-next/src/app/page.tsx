@@ -384,10 +384,18 @@ export default function Home() {
               </Terminal>
             </div>
           </Reveal>
+        </div>
+      </StackPanel>
+
+      {/* Attribution and footer sit in normal flow — they are reference
+          material, and a stacked panel that has to scroll inside itself is
+          the one shape this layout cannot hold. */}
+      <section className="relative z-10 bg-mid">
+        <div className="mx-auto w-full max-w-6xl px-6 lg:px-10">
           <BuiltOn />
           <Footer />
         </div>
-      </StackPanel>
+      </section>
     </main>
   );
 }
