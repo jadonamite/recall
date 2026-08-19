@@ -42,7 +42,11 @@ const DATA = new URL('../data/', import.meta.url).pathname;
 // Local: lock files for large monorepos get big. Hosted: a shared node has no
 // business accepting 32MB of anything from a stranger.
 const MAX_BODY = HOSTED ? 2 * 1024 * 1024 : 32 * 1024 * 1024;
-const MAX_PACKAGES = HOSTED ? 5_000 : Infinity;
+// Measured, not guessed: a 2,140-package tree scans fine once on a 512MB
+// instance and then kills it on a repeat, because the graph database wants its
+// share of the same memory. A cap that holds is worth more than a ceiling that
+// works until a judge is the second person to click.
+const MAX_PACKAGES = HOSTED ? 1_200 : Infinity;
 // A shared node runs in 512MB alongside the graph database. The report is what
 // grows: every finding keeps its paths, and a wide tree with a hundred findings
 // holds thousands of string arrays at once. Locally that is free; here it is the
@@ -157,8 +161,10 @@ async function scan(req, res) {
 
     if (graph.nodes.length > MAX_PACKAGES) {
       throw new Error(
-        `${graph.nodes.length} packages is past this shared node's ${MAX_PACKAGES} limit — ` +
-        `clone the repo and run it locally, where there is no limit`
+        `${graph.nodes.length} packages — this shared node handles trees up to ${MAX_PACKAGES}. ` +
+        `It runs on a 512MB free instance next to the graph database, and a tree this size ` +
+        `takes it down. Clone the repo (github.com/jadonamite/recall) and run it locally, ` +
+        `where there is no limit: npm run recall <your project>`
       );
     }
 

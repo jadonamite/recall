@@ -43,7 +43,7 @@ COPY scripts/serve.sh ./scripts/serve.sh
 # Keep V8 well under the instance's 512MB so the graph database keeps its share.
 # Without a ceiling, node grows its heap until the platform kills the container —
 # which shows up as a 502 mid-scan and a restart, not as an error message.
-ENV NODE_OPTIONS=--max-old-space-size=192 \
+ENV NODE_OPTIONS=--max-old-space-size=320 \
     RECALL_HOSTED=1 \
     HYDRA_BOLT=bolt://127.0.0.1:7687 \
     HYDRA_TOKEN=container-local-token-32-bytes-min \
