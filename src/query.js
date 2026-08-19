@@ -18,6 +18,7 @@
 'use strict';
 
 import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import neo4j from 'neo4j-driver';
 
 const DATA = new URL('../data/', import.meta.url).pathname;
@@ -63,9 +64,27 @@ export function safeRelType(t) {
 export const relTypeFor = (rootKey) =>
   safeRelType('IN_' + String(rootKey).toUpperCase()).slice(0, 120);
 
+/**
+ * A relationship type private to one *scan*, not one project name.
+ *
+ * `relTypeFor` derives the type from the root package's name, which is exactly
+ * right on a laptop and wrong the moment two people use the same node: every
+ * npm project scaffolded from the same template is `my-app@1.0.0`, and two
+ * visitors would then share a relationship type and walk each other's edges.
+ * A random type per scan makes that impossible.
+ */
+export const scanRelType = () =>
+  'SCAN_' + randomBytes(8).toString('hex').toUpperCase();
+
 export class Recall {
-  constructor() {
-    this.map = JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
+  /**
+   * @param {{map?: object}} [opts] an id map to use instead of reading the file.
+   *   A hosted node allocates ids in memory (see project.js), so the map on
+   *   disk is a stale baseline there and reading it would resolve keys to ids
+   *   that belong to different packages.
+   */
+  constructor({ map } = {}) {
+    this.map = map ?? JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
     this.driver = neo4j.driver(BOLT, neo4j.auth.basic('token', TOKEN), {
       disableLosslessIntegers: true,
     });
@@ -105,6 +124,19 @@ export class Recall {
       }
     }
     throw last;
+  }
+
+  /**
+   * Delete every edge of one relationship type.
+   *
+   * A hosted scan writes its tree under a type of its own and drops it again
+   * when the answer has been sent, so the store does not grow by one visitor's
+   * dependency graph per request.
+   */
+  async dropRelType(type) {
+    const t = safeRelType(type);
+    if (!t.startsWith('SCAN_')) throw new Error(`refusing to drop non-scan type: ${type}`);
+    await this.#retry(() => this.session.run(`MATCH ()-[r:${t}]->() DELETE r`));
   }
 
   /** Reopen the session — a connection that hit a packing fault stays unhappy. */

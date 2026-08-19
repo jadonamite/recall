@@ -20,3 +20,6 @@ site-next/public/site.json
 # font/logo build inputs — the outputs are embedded or committed
 .fonts/
 .assets/
+
+# unpacked hydradb image (~130MB of layers)
+.hydra-img/

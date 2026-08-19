@@ -1,12 +1,21 @@
 /**
- * Recall's local web UI.
+ * Recall's web UI and scan API.
  *
  * Zero dependencies beyond what the CLI already needs — node:http, one static
- * page, one streaming endpoint. It binds to loopback only: this tool resolves
- * paths on the local filesystem and talks to an unauthenticated local graph
- * database, neither of which belongs on a public interface.
+ * page, one streaming endpoint.
  *
- *   npm run ui   →   http://127.0.0.1:7676
+ *   npm run ui                     →  http://127.0.0.1:7676   (local, loopback)
+ *   RECALL_HOSTED=1 npm run ui     →  0.0.0.0:$PORT           (shared, public)
+ *
+ * The two modes are genuinely different products and the flag says which:
+ *
+ *   local   resolves paths on this filesystem, keeps what it scans in the
+ *           shared graph, and trusts whoever is at the keyboard.
+ *   hosted  accepts a pasted lock file and nothing else — no path ever reaches
+ *           the filesystem — writes the visitor's tree under a relationship
+ *           type private to that one scan, and deletes it again on the way out.
+ *           Nobody's dependency graph is kept, and nobody can see anybody
+ *           else's, which is what the landing page promises.
  *
  * POST /api/scan streams NDJSON progress lines rather than returning one blob
  * at the end. A first scan of an unseen project queries OSV for several hundred
@@ -22,12 +31,56 @@ import { isAbsolute, resolve as resolvePath } from 'node:path';
 
 import { resolveProject, fromLockObject } from './resolve.js';
 import { backfillAdvisories, upsert, report } from './project.js';
+import { Recall, scanRelType } from './query.js';
 
-const PORT = Number(process.env.PORT ?? 7676);
-const HOST = '127.0.0.1';
+const HOSTED = process.env.RECALL_HOSTED === '1';
+const PORT = Number(process.env.PORT ?? (HOSTED ? 8080 : 7676));
+const HOST = HOSTED ? '0.0.0.0' : '127.0.0.1';
 const PAGE = new URL('../public/index.html', import.meta.url).pathname;
+const DATA = new URL('../data/', import.meta.url).pathname;
 
-const MAX_BODY = 32 * 1024 * 1024; // lock files for large monorepos get big
+// Local: lock files for large monorepos get big. Hosted: a shared node has no
+// business accepting 32MB of anything from a stranger.
+const MAX_BODY = HOSTED ? 2 * 1024 * 1024 : 32 * 1024 * 1024;
+const MAX_PACKAGES = HOSTED ? 5_000 : Infinity;
+const MAX_NEW_NAMES = HOSTED ? 800 : Infinity;
+const SCAN_TIMEOUT_MS = HOSTED ? 3 * 60_000 : Infinity;
+
+/**
+ * Ids are allocated in memory here, never written back to disk.
+ *
+ * This is safe only because a hosted node wipes its store at boot and reloads
+ * the committed graph (see scripts/serve.sh): store and map then start from the
+ * same baseline. A map that outlived its store is precisely how a scan ends up
+ * writing edges to vertices that no longer exist.
+ */
+const hostedMap = HOSTED
+  ? JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'))
+  : undefined;
+
+/**
+ * One scan at a time.
+ *
+ * Not throughput management — correctness. Id allocation is read-modify-write
+ * over a single map, and two scans interleaving in it hand out one id for two
+ * different packages.
+ */
+let busy = false;
+
+const ORIGINS = (process.env.RECALL_ORIGIN ?? 'https://recall-brown.vercel.app')
+  .split(',').map((o) => o.trim()).filter(Boolean);
+
+function cors(req, res) {
+  const origin = req.headers.origin;
+  if (!HOSTED) return;
+  if (origin && (ORIGINS.includes(origin) || ORIGINS.includes('*'))) {
+    res.setHeader('access-control-allow-origin', origin);
+    res.setHeader('vary', 'origin');
+  }
+  res.setHeader('access-control-allow-methods', 'POST, GET, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type');
+  res.setHeader('access-control-max-age', '86400');
+}
 
 function readBody(req) {
   return new Promise((ok, fail) => {
@@ -50,7 +103,28 @@ const expand = (p) => {
   return isAbsolute(t) ? t : resolvePath(process.cwd(), t);
 };
 
+/** Delete a scan's edges. Best effort: a failure here must not fail the answer. */
+async function dropScan(relType, map) {
+  if (!relType) return;
+  const r = new Recall({ map });
+  try { await r.dropRelType(relType); }
+  catch (e) { console.error(`cleanup ${relType}: ${e?.message ?? e}`); }
+  finally { await r.close().catch(() => {}); }
+}
+
 async function scan(req, res) {
+  cors(req, res);
+
+  if (HOSTED && busy) {
+    res.writeHead(503, { 'content-type': 'application/x-ndjson; charset=utf-8', 'retry-after': '20' });
+    res.end(JSON.stringify({
+      stage: 'error',
+      message: 'another scan is running on this node — one at a time. Try again in a few seconds.',
+    }) + '\n');
+    return;
+  }
+  busy = true;
+
   res.writeHead(200, {
     'content-type': 'application/x-ndjson; charset=utf-8',
     'cache-control': 'no-store',
@@ -58,13 +132,31 @@ async function scan(req, res) {
   });
   const send = (o) => res.write(JSON.stringify(o) + '\n');
 
+  let relType;
+  const deadline = SCAN_TIMEOUT_MS === Infinity ? null
+    : setTimeout(() => { try { send({ stage: 'error', message: 'scan timed out' }); res.end(); } catch {} }, SCAN_TIMEOUT_MS);
+
   try {
     const { lock, dir, dev = false } = JSON.parse(await readBody(req));
+
+    // A hosted node never touches the filesystem on a visitor's say-so. `expand`
+    // resolves `~` and absolute paths, so honouring `dir` here would be an
+    // arbitrary file read wearing a scan's clothes.
+    if (HOSTED && dir) throw new Error('this node scans pasted lock files only');
+    if (HOSTED && !lock) throw new Error('paste a package-lock.json to scan');
 
     send({ stage: 'resolve', message: 'resolving dependency tree' });
     const graph = lock
       ? fromLockObject(typeof lock === 'string' ? JSON.parse(lock) : lock, { dev })
       : await resolveProject(expand(String(dir ?? '.')), { dev });
+
+    if (graph.nodes.length > MAX_PACKAGES) {
+      throw new Error(
+        `${graph.nodes.length} packages is past this shared node's ${MAX_PACKAGES} limit — ` +
+        `clone the repo and run it locally, where there is no limit`
+      );
+    }
+
     send({
       stage: 'resolved', root: graph.root, mode: graph.mode,
       packages: graph.nodes.length, edges: graph.edges.length,
@@ -72,25 +164,60 @@ async function scan(req, res) {
     });
 
     send({ stage: 'advisories', message: 'checking advisory history for every package name' });
-    const adv = await backfillAdvisories(graph.nodes.map((n) => n.name));
+    const adv = await backfillAdvisories(graph.nodes.map((n) => n.name), { maxNew: MAX_NEW_NAMES });
     send({ stage: 'advisories-done', ...adv });
 
     send({ stage: 'load', message: 'loading the tree into HydraDB' });
-    const { exposed, newPackages, relType } = await upsert(graph);
-    send({ stage: 'loaded', newPackages, hits: exposed.length });
+    const up = await upsert(graph, HOSTED
+      ? { relType: scanRelType(), map: hostedMap, persist: false, shared: false }
+      : {});
+    relType = up.relType;
+    send({ stage: 'loaded', newPackages: up.newPackages, hits: up.exposed.length, relType });
 
     send({ stage: 'recall', message: 'traversing DEPENDS_ON backwards from each vulnerable version' });
-    const out = await report(graph, exposed, { relType });
+    const out = await report(graph, up.exposed, { relType, map: HOSTED ? hostedMap : undefined });
     send({ stage: 'done', report: out });
   } catch (e) {
     send({ stage: 'error', message: e.message ?? String(e) });
   } finally {
+    if (deadline) clearTimeout(deadline);
     res.end();
+    // Release before cleaning up, not after. Deleting this scan's edges touches
+    // nothing the next scan needs — the lock exists to serialize id allocation —
+    // and holding it through cleanup means the next visitor is told the node is
+    // busy when it is only tidying up.
+    busy = false;
+    // After the answer is on the wire, not before it: the visitor waits for a
+    // recall, not for our housekeeping.
+    if (HOSTED) await dropScan(relType, hostedMap);
   }
 }
 
 const server = createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    cors(req, res);
+    res.writeHead(204);
+    return res.end();
+  }
+
   if (req.method === 'POST' && req.url === '/api/scan') return scan(req, res);
+
+  // Liveness that means something: the API is up AND it can reach the graph.
+  // A health check that only proves the HTTP server started would let a node
+  // with a dead HydraDB behind it stay in service.
+  if (req.method === 'GET' && req.url === '/healthz') {
+    cors(req, res);
+    const r = new Recall({ map: hostedMap });
+    try {
+      const n = (await r.vulnerable()).length;
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ ok: true, hosted: HOSTED, vulnerableVersions: n, busy }));
+    } catch (e) {
+      res.writeHead(503, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ ok: false, error: e?.message ?? String(e) }));
+    } finally { await r.close().catch(() => {}); }
+    return;
+  }
 
   if (req.method === 'GET' && (req.url === '/' || req.url.startsWith('/?'))) {
     // Read per request so editing the page during a demo needs only a refresh.
@@ -112,6 +239,10 @@ process.on('uncaughtException', (e) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`recall ui  ·  http://${HOST}:${PORT}`);
+  console.log(`recall ${HOSTED ? 'api' : 'ui '}  ·  http://${HOST}:${PORT}`);
   console.log(`hydradb    ·  ${process.env.HYDRA_BOLT ?? 'bolt://127.0.0.1:7687'}`);
+  if (HOSTED) {
+    console.log(`mode       ·  hosted — pasted lock files only, per-scan graph, nothing kept`);
+    console.log(`origins    ·  ${ORIGINS.join(', ')}`);
+  }
 });

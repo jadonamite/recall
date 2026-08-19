@@ -58,13 +58,23 @@ const ndjson = (f) =>
  * its advisory history fetched, or it silently reads as clean — the worst
  * possible failure mode for a tool whose whole claim is completeness.
  */
-export async function backfillAdvisories(names, { concurrency = 4 } = {}) {
+export async function backfillAdvisories(names, { concurrency = 4, maxNew = Infinity } = {}) {
   const doneFile = `${DATA}advisory-names.done`;
   const done = new Set(
     existsSync(doneFile) ? readFileSync(doneFile, 'utf8').split('\n').filter(Boolean) : []
   );
   const todo = [...new Set(names)].filter((n) => !done.has(n));
   if (!todo.length) return { queried: 0, added: 0 };
+  // A shared node cannot spend four minutes in OSV on one visitor's request.
+  // Refusing with the number is honest; a silent partial backfill would report
+  // unseen packages as clean, which is the one failure this tool must not have.
+  if (todo.length > maxNew) {
+    throw new Error(
+      `this tree needs advisory history for ${todo.length} package names the shared graph has ` +
+      `never seen, over the ${maxNew} this node fetches per scan — run it locally ` +
+      `(git clone github.com/jadonamite/recall) where there is no such cap`
+    );
+  }
 
   process.stdout.write(`  advisories: 0/${todo.length} names`);
   let idx = 0, added = 0, failed = 0;
@@ -97,10 +107,27 @@ export async function backfillAdvisories(names, { concurrency = 4 } = {}) {
 
 // ------------------------------------------------------------------ upsert
 
-/** Push a resolved project graph into HydraDB next to the seeded graph. */
-export async function upsert(graph, { extraRelTypes = [] } = {}) {
-  const relType = relTypeFor(graph.root);
-  const map = JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
+/**
+ * Push a resolved project graph into HydraDB next to the seeded graph.
+ *
+ * @param {object} graph resolved tree from resolve.js
+ * @param {object} [opts]
+ * @param {string[]} [opts.extraRelTypes] additional types to write the edges under
+ * @param {string} [opts.relType] the tree's own type; defaults to one derived
+ *   from the root's name. A hosted node passes a per-scan type instead — see
+ *   `scanRelType` in query.js for why the name-derived one is unsafe there.
+ * @param {object} [opts.map] id map to allocate into, instead of reading the
+ *   file. Callers that pass one own it, and get it back on the result.
+ * @param {boolean} [opts.persist=true] write the id map back to disk.
+ * @param {boolean} [opts.shared=true] also write the edges into the shared
+ *   DEPENDS_ON graph. A hosted node sets this false: a visitor's tree is theirs,
+ *   and the landing page says so out loud.
+ */
+export async function upsert(graph, {
+  extraRelTypes = [], relType: relTypeIn, map: mapIn, persist = true, shared = true,
+} = {}) {
+  const relType = relTypeIn ?? relTypeFor(graph.root);
+  const map = mapIn ?? JSON.parse(readFileSync(`${DATA}idmap.json`, 'utf8'));
   const windows = ndjson('advisory-windows.ndjson');
 
   const byName = new Map();
@@ -169,10 +196,12 @@ export async function upsert(graph, { extraRelTypes = [] } = {}) {
       .filter((r) => r.f !== undefined && r.t !== undefined)
       .map((r) => ({ f: neo4j.int(r.f), t: neo4j.int(r.t), rid: neo4j.int(r.f * 100_000 + r.t) }));
 
-    // Twice: once into the shared DEPENDS_ON graph the global queries use, and
-    // once under a type private to this project so its traversal cannot be
-    // crowded out of `pathCount` by an unrelated project in the same store.
-    for (const type of [...new Set(['DEPENDS_ON', relType, ...extraRelTypes])]) {
+    // Normally twice: once into the shared DEPENDS_ON graph the global queries
+    // use, and once under a type private to this project so its traversal cannot
+    // be crowded out of `pathCount` by an unrelated project in the same store.
+    // A hosted node writes the private type only — see `shared` above.
+    const types = shared ? ['DEPENDS_ON', relType, ...extraRelTypes] : [relType, ...extraRelTypes];
+    for (const type of [...new Set(types)]) {
       await batched(`depends_on:${type}`, depRows, `
         UNWIND $rows AS row
         MATCH (s:Package {id: row.f}), (t:Package {id: row.t})
@@ -190,8 +219,8 @@ export async function upsert(graph, { extraRelTypes = [] } = {}) {
     await driver.close();
   }
 
-  writeFileSync(`${DATA}idmap.json`, JSON.stringify(map));
-  return { newPackages: newNodes.length, edges: graph.edges.length, exposed, relType };
+  if (persist) writeFileSync(`${DATA}idmap.json`, JSON.stringify(map));
+  return { newPackages: newNodes.length, edges: graph.edges.length, exposed, relType, map };
 }
 
 // ------------------------------------------------------------------ report
@@ -204,9 +233,11 @@ export async function upsert(graph, { extraRelTypes = [] } = {}) {
  * chain is a direct dependency — the only thing the developer can actually
  * change. Grouping findings by that hop is what turns the wall into a list.
  */
-export async function report(graph, exposed, { maxLen = 12, limit = 5000, keepPaths = 40, relType } = {}) {
+export async function report(graph, exposed, {
+  maxLen = 12, limit = 5000, keepPaths = 40, relType, map,
+} = {}) {
   const type = relType ?? relTypeFor(graph.root);
-  const r = new Recall();
+  const r = new Recall({ map });
   const byDirect = new Map();
   const unreachable = [];
   const details = [];
