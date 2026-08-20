@@ -467,6 +467,26 @@
     font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+
+  /* The shared node's state, in the terminal's own chrome. A free instance
+     sleeps after 15 minutes, so the page wakes it on load rather than letting
+     the first click be the request that waits a minute. */
+  .nodestat {
+    margin-left: auto; display: none; align-items: center; gap: 7px; flex: none;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .nodestat.on { display: inline-flex; }
+  .nodestat i {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none;
+  }
+  .nodestat.wake { color: var(--accent); }
+  .nodestat.wake i { animation: pulse 1.1s ease-in-out infinite; }
+  .nodestat.up { color: var(--low); }
+  .nodestat.down { color: var(--crit); }
+  @media (prefers-reduced-motion: reduce) { .nodestat.wake i { animation: none; } }
+  @media (max-width: 620px) { .nodestat { display: none !important; } }
+
   .console { padding: 0; }
   .console-body { padding: 20px; }
   /* inside a frame the child supplies no chrome of its own */
@@ -550,6 +570,7 @@
   <div class="term-bar">
     <span class="lights"><i></i><i></i><i></i></span>
     <span class="term-title">recall — npm run ui</span>
+    <span class="nodestat" id="nodestat"><i></i><span id="nodestat-text"></span></span>
   </div>
   <div class="console-body">
   <div class="tabs" role="tablist">
@@ -795,6 +816,60 @@ function hostedConsole() {
   const note = $('hosted-note');
   if (note) note.classList.add('on');
   document.querySelector('.term-title').textContent = 'recall — shared node';
+  probeNode();
+}
+
+/**
+ * Wake the shared node while the page is being read.
+ *
+ * A free instance sleeps after 15 minutes idle and takes 30–60s to answer the
+ * request that wakes it. Left alone, that request is the visitor's first scan,
+ * and a minute of nothing is how a demo dies — so the page knocks on the door
+ * itself, on load, and says out loud which state the node is in.
+ *
+ * Nothing is disabled while it waits. A cold start still serves a scan
+ * correctly, it just serves it slowly; taking the button away would trade a
+ * slow answer for no answer.
+ *
+ * Render answers for a service whose container is not up yet, with a 200 and
+ * its own `{"status":"ok"}`. Only `hosted: true` means Recall is on the line.
+ */
+async function probeNode() {
+  const box = $('nodestat');
+  const text = $('nodestat-text');
+  if (!box || !text) return;
+  box.classList.add('on');
+
+  const set = (cls, msg) => { box.className = 'nodestat on ' + cls; text.textContent = msg; };
+  const t0 = Date.now();
+  const waited = () => Math.round((Date.now() - t0) / 1000);
+
+  set('wake', 'waking the shared node');
+  while (Date.now() - t0 < 150_000) {
+    try {
+      const r = await fetch(API + '/healthz', { cache: 'no-store' });
+      const h = r.ok ? await r.json().catch(() => ({})) : {};
+      if (h.hosted) {
+        set('up', h.busy
+          ? 'shared node up · another scan is running'
+          : `shared node up · ${h.vulnerableVersions} vulnerable versions in the graph`);
+        return;
+      }
+    } catch { /* asleep, or between containers — both look like this */ }
+    set('wake', `waking the shared node · ${waited()}s`);
+    // Back off as the wait grows: a cold start is tens of seconds, and knocking
+    // every three of them for two minutes is just noise on somebody's free tier.
+    await new Promise((r) => setTimeout(r, Math.min(3_000 + waited() * 200, 10_000)));
+  }
+
+  set('down', 'shared node not answering');
+  const note = $('hosted-note');
+  if (note) {
+    note.innerHTML = 'The <strong>shared HydraDB node</strong> is not answering right now — it runs on a '
+      + 'free instance, and a scan started now will probably fail. Everything here runs on a laptop '
+      + 'in about ten seconds: <code>git clone github.com/jadonamite/recall</code>, then '
+      + '<code>npm run recall &lt;your project&gt;</code>. The scan below is recorded and is unaffected.';
+  }
 }
 
 // ------------------------------------------------------------------- tabs
