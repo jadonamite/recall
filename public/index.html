@@ -741,10 +741,6 @@
         </p>
       </div>
 
-      <div class="panel side-card">
-        <h4>Read this before believing it</h4>
-        <div class="caveat" id="caveats"></div>
-      </div>
     </aside>
   </div>
 </section>
@@ -1052,6 +1048,10 @@ function chainEl(path) {
 }
 
 function render(r, elapsed) {
+  // The recorded scan loads on arrival and its disclosure with it. The moment a
+  // live scan answers, that disclosure is describing the wrong thing, so it goes.
+  $('recorded').classList.toggle('on', elapsed === 'recorded');
+
   $('root').textContent = r.root;
   const mode = $('mode');
   mode.textContent = r.mode === 'lockfile' ? 'exact · from package-lock.json' : 'approximate · resolved from package.json';
@@ -1140,23 +1140,6 @@ function render(r, elapsed) {
     flat.append(el('div', null, `${label.padEnd(9)} ${key.padEnd(42)} ${osv}  ${sum.slice(0, 80)}`));
   }
   if (!rows.length) flat.append(el('div', null, 'no findings'));
-
-  // ---- caveats, stated in the artifact rather than left for a judge to find
-  const cav = $('caveats');
-  cav.replaceChildren();
-  const notes = [];
-  if (r.mode === 'lockfile') {
-    notes.push('Edges are recovered by replaying npm’s own node_modules lookup rules against the lock file, so nested copies of the same package stay distinct.');
-  } else {
-    notes.push('No lock file was found, so ranges were resolved the way npm would install them today. That is not necessarily what this project is running.');
-  }
-  notes.push('Recall reports that a vulnerable version is present and by what chain. It does not claim the vulnerable code is reachable at runtime — that is a separate, harder question.');
-  if (r.unreachable.length) {
-    notes.push(r.unreachable.length + ' vulnerable version(s) had no path from the root within the traversal depth and are excluded from the counts above.');
-  }
-  const un = Object.entries(r.severities).find(([k, n]) => k === 'UNRATED' && n);
-  if (un) notes.push(un[1] + ' advisory record(s) carry a CVSS v4 vector or no severity at all; those are shown UNRATED rather than scored with the wrong formula.');
-  for (const n of notes) cav.append(el('p', null, n));
 
   $('how').classList.add('off');
   $('out').classList.add('on');
