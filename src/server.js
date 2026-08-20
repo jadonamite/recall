@@ -29,7 +29,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
 
-import { resolveProject, fromLockObject } from './resolve.js';
+import { resolveProject, fromLockObject, fetchRepoLock } from './resolve.js';
 import { backfillAdvisories, upsert, report } from './project.js';
 import { Recall, scanRelType } from './query.js';
 
@@ -149,17 +149,28 @@ async function scan(req, res) {
     : setTimeout(() => { try { send({ stage: 'error', message: 'scan timed out' }); res.end(); } catch {} }, SCAN_TIMEOUT_MS);
 
   try {
-    const { lock, dir, dev = false } = JSON.parse(await readBody(req));
+    const { lock, dir, repo, dev = false } = JSON.parse(await readBody(req));
 
     // A hosted node never touches the filesystem on a visitor's say-so. `expand`
     // resolves `~` and absolute paths, so honouring `dir` here would be an
     // arbitrary file read wearing a scan's clothes.
     if (HOSTED && dir) throw new Error('this node scans pasted lock files only');
-    if (HOSTED && !lock) throw new Error('paste a package-lock.json to scan');
+    if (HOSTED && !lock && !repo) throw new Error('name a GitHub repository or paste a package-lock.json to scan');
 
-    send({ stage: 'resolve', message: 'resolving dependency tree' });
-    const graph = lock
-      ? fromLockObject(typeof lock === 'string' ? JSON.parse(lock) : lock, { dev })
+    // A named repository is just a lock file that has not been fetched yet:
+    // it becomes one here, and everything downstream is the paste path.
+    let source = lock;
+    if (repo && !lock) {
+      send({ stage: 'resolve', message: `fetching package-lock.json from ${String(repo).trim()}` });
+      const got = await fetchRepoLock(repo);
+      source = got.lock;
+      send({ stage: 'resolve', message: `resolving ${got.label}` });
+    } else {
+      send({ stage: 'resolve', message: 'resolving dependency tree' });
+    }
+
+    const graph = source
+      ? fromLockObject(typeof source === 'string' ? JSON.parse(source) : source, { dev })
       : await resolveProject(expand(String(dir ?? '.')), { dev });
 
     if (graph.nodes.length > MAX_PACKAGES) {

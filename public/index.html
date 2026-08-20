@@ -140,6 +140,16 @@
   textarea { min-height: 132px; resize: vertical; line-height: 1.45; }
   .hint { margin: 9px 2px 0; color: var(--ink-faint); font-size: 12.5px; }
 
+  .egs { display: flex; align-items: center; gap: 7px; margin: 11px 2px 0; flex-wrap: wrap; }
+  .egs .lbl { color: var(--ink-faint); font-size: 12.5px; }
+  .eg {
+    appearance: none; background: var(--bg-sunk); border: 1px solid var(--line);
+    color: var(--ink-dim); font-family: var(--mono); font-size: 12px;
+    padding: 5px 10px; border-radius: 999px; cursor: pointer; transition: .14s;
+  }
+  .eg:hover { color: var(--ink); border-color: var(--accent-dim); }
+  .eg:disabled { opacity: .45; cursor: default; }
+
   .controls { display: flex; align-items: center; gap: 18px; margin-top: 16px; flex-wrap: wrap; }
   .btn {
     appearance: none; border: 0; border-radius: 9px; cursor: pointer;
@@ -544,6 +554,7 @@
   <div class="console-body">
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true" data-field="f-dir">Local project</button>
+    <button class="tab" role="tab" aria-selected="false" data-field="f-repo">GitHub repo</button>
     <button class="tab" role="tab" aria-selected="false" data-field="f-lock">Paste package-lock.json</button>
   </div>
 
@@ -551,6 +562,19 @@
     <input type="text" id="dir" value="~/Projects/Chessify" spellcheck="false"
            placeholder="~/code/my-app" aria-label="Project directory">
     <p class="hint">A directory containing <code>package-lock.json</code> (exact) or <code>package.json</code> (resolved as npm would install today).</p>
+  </div>
+
+  <div class="field" id="f-repo">
+    <input type="text" id="repo" spellcheck="false" placeholder="axios/axios"
+           aria-label="GitHub repository">
+    <p class="hint">A public repository with a committed <code>package-lock.json</code>. Add
+       <code>@branch</code> or <code>@tag</code> to pin a ref; the default branch is used otherwise.</p>
+    <div class="egs">
+      <span class="lbl">try</span>
+      <button class="eg" data-repo="axios/axios">axios/axios</button>
+      <button class="eg" data-repo="nodejs/undici">nodejs/undici</button>
+      <button class="eg" data-repo="ethers-io/ethers.js">ethers-io/ethers.js</button>
+    </div>
   </div>
 
   <div class="field" id="f-lock">
@@ -564,9 +588,9 @@
   </div>
 
   <p class="hosted-note" id="hosted-note">
-    This runs against a <strong>shared HydraDB node</strong>, not your machine. Your lock file is
-    resolved, traversed, and thrown away: the tree is written under a relationship type belonging
-    to this one scan and deleted when the answer is sent, so nothing you paste joins the public
+    This runs against a <strong>shared HydraDB node</strong>, not your machine. The lock file —
+    fetched from the repository you name, or pasted here — is resolved, traversed, and thrown away: the tree is written under a relationship type belonging
+    to this one scan and deleted when the answer is sent, so nothing you scan joins the public
     graph or is visible to anyone else. The node sleeps when idle, so the first scan after a quiet
     spell waits about a minute for it to wake, and it runs one scan at a time.
   </p>
@@ -755,9 +779,14 @@ function hostedConsole() {
   if (dirTab) dirTab.remove();
   $('f-dir')?.remove();
   const lockTab = document.querySelector('.tab[data-field="f-lock"]');
-  if (lockTab) { lockTab.setAttribute('aria-selected', 'true'); lockTab.textContent = 'Scan your own lock file'; }
-  $('f-lock')?.classList.add('on');
-  source = 'lock';
+  if (lockTab) { lockTab.setAttribute('aria-selected', 'false'); lockTab.textContent = 'Paste your own lock file'; }
+  $('f-lock')?.classList.remove('on');
+  // Naming a repository is the shortest path to a real answer — no file to find,
+  // nothing to paste — so it is what the shared node opens on.
+  const repoTab = document.querySelector('.tab[data-field="f-repo"]');
+  if (repoTab) repoTab.setAttribute('aria-selected', 'true');
+  $('f-repo')?.classList.add('on');
+  source = 'repo';
   $('run').textContent = 'Run a live recall';
   // The local page's promise — "nothing leaves this machine" — is exactly the
   // thing that stops being true here, so it cannot survive the switch.
@@ -774,7 +803,7 @@ for (const tab of document.querySelectorAll('.tab')) {
   tab.addEventListener('click', () => {
     for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t === tab));
     for (const f of document.querySelectorAll('.field')) f.classList.toggle('on', f.id === tab.dataset.field);
-    source = tab.dataset.field === 'f-dir' ? 'dir' : 'lock';
+    source = tab.dataset.field.slice(2);
   });
 }
 
@@ -831,6 +860,10 @@ async function loadRecorded(src) {
 // ------------------------------------------------------------------- run
 $('run').addEventListener('click', run);
 $('dir').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+$('repo').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+for (const eg of document.querySelectorAll('.eg')) {
+  eg.addEventListener('click', () => { $('repo').value = eg.dataset.repo; run(); });
+}
 
 if (window.RECALL_DEMO) {
   loadRecorded(window.RECALL_DEMO).catch((e) => fail(e.message));
@@ -838,7 +871,9 @@ if (window.RECALL_DEMO) {
 
 async function run() {
   const btn = $('run');
+  const egs = [...document.querySelectorAll('.eg')];
   btn.disabled = true;
+  for (const e of egs) e.disabled = true;
   $('err').classList.remove('on');
   $('out').classList.remove('on');
   $('progress').classList.add('on');
@@ -849,9 +884,10 @@ async function run() {
 
   const t0 = performance.now();
   try {
-    const body = source === 'dir'
-      ? { dir: $('dir').value, dev: $('dev').checked }
-      : { lock: $('lock').value, dev: $('dev').checked };
+    const body = { dev: $('dev').checked };
+    if (source === 'dir') body.dir = $('dir').value;
+    else if (source === 'repo') body.repo = $('repo').value;
+    else body.lock = $('lock').value;
 
     const res = await fetch(API + '/api/scan', {
       method: 'POST',
@@ -875,7 +911,7 @@ async function run() {
         if (!line.trim()) continue;
         const ev = JSON.parse(line);
 
-        if (ev.stage === 'resolve') mark('resolve', 'active');
+        if (ev.stage === 'resolve') mark('resolve', 'active', ev.message);
         else if (ev.stage === 'resolved') {
           mark('resolve', 'ok', `resolved ${ev.packages.toLocaleString()} packages · ${ev.edges.toLocaleString()} edges`);
           for (const w of ev.warnings ?? []) console.warn('unresolved:', w);
@@ -915,6 +951,7 @@ async function run() {
     fail(e.message);
   } finally {
     btn.disabled = false;
+    for (const e of egs) e.disabled = false;
   }
 }
 
