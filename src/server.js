@@ -46,12 +46,21 @@ const MAX_BODY = HOSTED ? 2 * 1024 * 1024 : 32 * 1024 * 1024;
 // instance and then kills it on a repeat, because the graph database wants its
 // share of the same memory. A cap that holds is worth more than a ceiling that
 // works until a judge is the second person to click.
-const MAX_PACKAGES = HOSTED ? 1_200 : Infinity;
+const MAX_PACKAGES = HOSTED ? 1_800 : Infinity;
 // A shared node runs in 512MB alongside the graph database. The report is what
 // grows: every finding keeps its paths, and a wide tree with a hundred findings
 // holds thousands of string arrays at once. Locally that is free; here it is the
 // difference between answering and being OOM-killed mid-scan.
-const REPORT_OPTS = HOSTED ? { limit: 1_200, keepPaths: 12 } : {};
+// …so the ceiling on the report moves with the tree instead of being one
+// number for every size. A 1,600-package project has more findings and wider
+// paths than a 600-package one; keeping twelve paths per finding for both is
+// what puts the big one over the edge. Above 1,200 packages the report keeps
+// fewer paths per finding — the chains still show, there are just fewer of the
+// redundant ones behind each.
+const reportOpts = (packages) => {
+  if (!HOSTED) return {};
+  return packages > 1_200 ? { limit: 900, keepPaths: 4 } : { limit: 1_200, keepPaths: 12 };
+};
 const MAX_NEW_NAMES = HOSTED ? 800 : Infinity;
 const SCAN_TIMEOUT_MS = HOSTED ? 3 * 60_000 : Infinity;
 
@@ -114,6 +123,31 @@ const expand = (p) => {
   if (t.startsWith('~')) return resolvePath(homedir(), t.slice(1).replace(/^\/+/, ''));
   return isAbsolute(t) ? t : resolvePath(process.cwd(), t);
 };
+
+/**
+ * Hand the container back when it is carrying too much.
+ *
+ * A scan's edges are dropped on the way out, but its *vertices* stay: every new
+ * package a visitor brings gets an id in the in-memory map and a vertex in the
+ * store, and neither is ever handed back. Four 1,600-package scans in a row put
+ * node at 256MB next to a 216MB database on a 512MB instance — the fifth one is
+ * an OOM kill in the middle of somebody's answer.
+ *
+ * So the process retires itself between scans instead. Render restarts the
+ * container, `serve.sh` wipes the store and reloads the committed graph, and the
+ * next visitor waits for a cold start they can see — the page's status pill says
+ * "waking the shared node" — rather than watching a scan die at 90%.
+ */
+const RSS_CEILING = Number(process.env.RECALL_RSS_CEILING_MB ?? 230) * 1024 * 1024;
+
+function recycleIfHeavy() {
+  const { rss } = process.memoryUsage();
+  if (rss < RSS_CEILING) return;
+  const mb = (n) => Math.round(n / (1024 * 1024));
+  console.error(`rss ${mb(rss)}MB over the ${mb(RSS_CEILING)}MB ceiling — retiring this container`);
+  // The answer is already on the wire; give the socket a moment to drain.
+  setTimeout(() => process.exit(0), 500).unref();
+}
 
 /** Delete a scan's edges. Best effort: a failure here must not fail the answer. */
 async function dropScan(relType, map) {
@@ -201,7 +235,7 @@ async function scan(req, res) {
 
     send({ stage: 'recall', message: 'traversing DEPENDS_ON backwards from each vulnerable version' });
     const out = await report(graph, up.exposed, {
-      relType, map: HOSTED ? hostedMap : undefined, ...REPORT_OPTS,
+      relType, map: HOSTED ? hostedMap : undefined, ...reportOpts(graph.nodes.length),
     });
     send({ stage: 'done', report: out });
   } catch (e) {
@@ -216,7 +250,10 @@ async function scan(req, res) {
     busy = false;
     // After the answer is on the wire, not before it: the visitor waits for a
     // recall, not for our housekeeping.
-    if (HOSTED) await dropScan(relType, hostedMap);
+    if (HOSTED) {
+      await dropScan(relType, hostedMap);
+      recycleIfHeavy();
+    }
   }
 }
 
