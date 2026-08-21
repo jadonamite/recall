@@ -309,6 +309,54 @@ rebuilds both together.
 - **That upgrading the listed dependency is always possible.** Sometimes the fix is an `overrides` entry, and sometimes upstream has not shipped one. Recall tells you where the path enters; it does not promise the door opens.
 - **That the hosted demo is live.** It is a recorded scan, labelled as one on the page. The traversal genuinely ran against HydraDB — just on a laptop, before deployment, not in response to your click.
 
+## Roadmap
+
+What this becomes past the hackathon build, in the order that matters most first.
+
+1. **Kill the local graph-DB requirement.** Today HydraDB has to run on the
+   evaluator's own machine over Bolt — a non-starter for anyone judging a tool
+   in under five minutes. The fix is a hosted, multi-tenant graph store (a
+   managed HydraDB deployment, or a swap to a managed graph service) so
+   "connect your repo, see results" needs zero local setup. This is the
+   single biggest blocker between a demo and something people can actually
+   adopt.
+2. **Ship where the buying decision happens: CI and PRs.** Security tooling
+   gets bought by teams, and teams adopt what gates a merge. A GitHub Action
+   or App that comments on a PR — "this dependency bump introduces 3 new
+   reachable paths" — is a different sales motion than "clone this and run a
+   local database." It is also the natural point to charge: per-repo or
+   per-seat, tied into GitHub/GitLab.
+3. **Prove it continuously, not with one recording.** The published demo is a
+   single recorded scan of jitsi-meet (see *What this does not claim*, above).
+   Trust comes from a live, always-on scan across a rotating set of open-source
+   repos, or a self-serve "bring your own repo" demo a prospect can run
+   without talking to sales first.
+
+Three specific upgrades past that, each a plausible free-vs-paid line:
+
+- **Runtime reachability.** The README above explicitly disclaims this — Recall
+  shows a vulnerable version is in the tree, not that the vulnerable function
+  is ever called. Call-graph/AST analysis to answer that is the feature that
+  turns "111 findings → 15 upgrades" into "111 findings → 3 that actually
+  matter." It's the hard engineering Socket.dev and Snyk charge the most for,
+  which is exactly why it's worth charging for here too.
+- **Continuous monitoring and PR-gating**, not one-shot CLI scans. Free tier:
+  run it by hand against a snapshot. Paid tier: re-run the recall on every PR,
+  track the blast-radius delta a dependency bump introduces, flag or block
+  merges that add new critical paths. That turns a one-time utility into a
+  subscription tied to a workflow the team already has.
+- **Fix automation, not just diagnosis.** Recall already ranks the 15 direct
+  dependencies to upgrade by paths severed. The natural extension is
+  generating the actual PR — bump the version, run tests, open the PR, and for
+  overrides-only fixes, write the override entry. Diagnosis is free;
+  automated remediation is what a team pays recurring fees for, because it
+  saves engineering hours directly.
+
+The shape across all three: today Recall answers *where does this
+vulnerability come from*. The paid version has to also answer *does it
+matter* (reachability) and *just fix it* (automation), continuously, inside
+the workflow the team already uses.
+
 ## Known rough edge
 
 The Bolt driver throws `RangeError: offset out of range` while packing large writes against this server, and throws it asynchronously enough to escape a `try`/`catch` and take the process with it. It scales with payload bytes, so writes are batched conservatively (25 rows for anything carrying strings, 100 for id-only rows) and the UI server survives it rather than dying mid-scan. It is a driver/server interaction, not a data problem — the same rows succeed in smaller batches.
