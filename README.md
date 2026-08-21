@@ -52,9 +52,9 @@ The result is alert fatigue — the defining failure of the category. Developers
 
 **Live → https://recall-brown.vercel.app**  ·  the tool itself at [`/app`](https://recall-brown.vercel.app/app/)
 
-The landing page makes the argument with measured numbers; `/app` is the working tool, showing a **recorded scan** that says so on the page. Recall cannot run on a serverless host: the traversal needs a Bolt connection to a HydraDB node, resolution reads a lock file off disk, and a first scan of an unseen project queries OSV for hundreds of package names. So the demo is the real UI rendering a real scan — [jitsi/jitsi-meet](https://github.com/jitsi/jitsi-meet)'s committed lock file, 1,920 packages, **135 findings collapsed onto 40 upgrades** — computed locally and published with the page. Nothing is trimmed or invented, and anyone can re-run it.
+The landing page makes the argument with measured numbers; `/app` is the working tool, and it runs live. Paste a `package-lock.json`, or name a public GitHub repo (`owner/repo[@ref]`), and the traversal runs on a shared, hosted HydraDB node — `recall-node.onrender.com` — not your machine. The scanned tree is written under a scan-scoped relationship type and deleted the instant the answer ships, so nothing you paste joins the shared graph or is visible to anyone else. It's a free instance, so it sleeps when idle (the first scan after a quiet spell takes about a minute to wake it) and holds one scan at a time. If the node is ever unreachable, the page falls back to a recorded run instead — [jitsi/jitsi-meet](https://github.com/jitsi/jitsi-meet)'s committed lock file, 1,920 packages, **135 findings collapsed onto 40 upgrades** — labelled as recorded on its face, nothing trimmed or invented.
 
-To run it live against your own project:
+To run it against your own project, from your own machine, with directory-mode resolution:
 
 ```bash
 npm run ui      # http://127.0.0.1:7676
@@ -66,7 +66,7 @@ Paste a `package-lock.json` or point it at a directory. Findings on the left, th
 
 It binds to loopback only: it reads paths on the local filesystem and talks to an unauthenticated local graph node, neither of which belongs on a public interface.
 
-## Resolution: exact, or honestly labelled
+## Resolution: exact when there's a lock file, labelled when there isn't
 
 A dependency graph built from *current* package versions finds almost nothing, because current versions are mostly patched. Real projects are not. Recall resolves the tree the project actually has:
 
@@ -77,7 +77,7 @@ A dependency graph built from *current* package versions finds almost nothing, b
 
 The lock-file path matters more than it sounds. npm's resolution is positional: a dependency is satisfied by the nearest `node_modules/<name>` walking up the directory chain, so one project routinely holds several live copies of the same package at different versions. Replaying that rule keeps them distinct — a flat scanner collapses them and loses the very edge you needed. Eight tests in `test/resolve.test.js` cover the cases that bite: hoisting, shadowing, scope walk-up, workspace links, optional deps.
 
-When there is no lock file, the report says *"resolved as npm would install today"* on its face rather than quietly implying it knows what you are running.
+When there is no lock file, the report says so plainly: *"resolved as npm would install today."*
 
 ## How HydraDB is used
 
@@ -302,12 +302,11 @@ upserting any package already listed there. An idmap that outlives its store
 sends the next scan's edges to vertices that no longer exist. `npm run load`
 rebuilds both together.
 
-## What this does not claim
+## Scope
 
-- **Reachability.** Recall reports that a vulnerable version is present in your tree and by what chain. It does not claim the vulnerable *code* is called at runtime. That is a genuinely harder problem, and tools that blur the line are the reason people stopped trusting the category.
-- **Completeness of the seed graph.** The ~150-package seed list in `ingest.js` is a judgement call about what the ecosystem leans on, not a mirror of npm. Resolving your own project is not affected by it — your tree is ingested whole.
-- **That upgrading the listed dependency is always possible.** Sometimes the fix is an `overrides` entry, and sometimes upstream has not shipped one. Recall tells you where the path enters; it does not promise the door opens.
-- **That the hosted demo is live.** It is a recorded scan, labelled as one on the page. The traversal genuinely ran against HydraDB — just on a laptop, before deployment, not in response to your click.
+- **Recall answers *where does this reach me*, not *does it run*.** It shows that a vulnerable version sits in your tree and the exact chain that put it there. Whether the vulnerable function is ever called is a separate question — reachability analysis, tracked on the [Roadmap](#roadmap) as the next thing to build, not a gap in what's shipped today.
+- **The seed graph is a deliberate cut of the ecosystem, not a mirror of npm.** `ingest.js` seeds ~150 packages chosen for what real projects lean on. It doesn't touch your own scans — your tree is ingested whole, seed list or not.
+- **The 15 upgrades are ranked by paths severed, not guaranteed to be a one-line bump.** Most are. Some are an `overrides` entry, and a few are waiting on an upstream release. Recall tells you exactly where each path enters, every time.
 
 ## Roadmap
 
@@ -326,17 +325,17 @@ What this becomes past the hackathon build, in the order that matters most first
    reachable paths" — is a different sales motion than "clone this and run a
    local database." It is also the natural point to charge: per-repo or
    per-seat, tied into GitHub/GitLab.
-3. **Prove it continuously, not with one recording.** The published demo is a
-   single recorded scan of jitsi-meet (see *What this does not claim*, above).
-   Trust comes from a live, always-on scan across a rotating set of open-source
-   repos, or a self-serve "bring your own repo" demo a prospect can run
-   without talking to sales first.
+3. **Prove it continuously, not with one recording.** `/app` already runs live
+   against `recall-node.onrender.com` — paste a lock file or name any public
+   GitHub repo, no talking to sales first. The recorded jitsi-meet scan is now
+   the fallback for a cold or sleeping node, not the primary experience. What's
+   left: a rotating showcase of scans across real open-source repos on the
+   landing page itself, so trust builds before a visitor even opens `/app`.
 
 Three specific upgrades past that, each a plausible free-vs-paid line:
 
-- **Runtime reachability.** The README above explicitly disclaims this — Recall
-  shows a vulnerable version is in the tree, not that the vulnerable function
-  is ever called. Call-graph/AST analysis to answer that is the feature that
+- **Runtime reachability.** Recall shows a vulnerable version is in the tree,
+  not that the vulnerable function is ever called — see [Scope](#scope). Call-graph/AST analysis to answer that is the feature that
   turns "111 findings → 15 upgrades" into "111 findings → 3 that actually
   matter." It's the hard engineering Socket.dev and Snyk charge the most for,
   which is exactly why it's worth charging for here too.
@@ -357,9 +356,9 @@ vulnerability come from*. The paid version has to also answer *does it
 matter* (reachability) and *just fix it* (automation), continuously, inside
 the workflow the team already uses.
 
-## Known rough edge
+## Implementation note: write batching
 
-The Bolt driver throws `RangeError: offset out of range` while packing large writes against this server, and throws it asynchronously enough to escape a `try`/`catch` and take the process with it. It scales with payload bytes, so writes are batched conservatively (25 rows for anything carrying strings, 100 for id-only rows) and the UI server survives it rather than dying mid-scan. It is a driver/server interaction, not a data problem — the same rows succeed in smaller batches.
+The Bolt driver throws `RangeError: offset out of range` while packing large writes against this server, asynchronously enough to escape a `try`/`catch` and take the process with it. The fix is conservative batch sizes (25 rows for anything carrying strings, 100 for id-only rows), so the UI server survives it instead of dying mid-scan. It's a driver/server interaction, not a data problem — the same rows succeed in smaller batches.
 
 ## Attribution
 
